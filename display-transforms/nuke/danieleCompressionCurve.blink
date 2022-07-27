@@ -1,0 +1,124 @@
+
+kernel danielleCompressionCurveKernel : ImageComputationKernel<ePixelWise>
+{
+  Image<eRead, eAccessPoint, eEdgeClamped> src; // the input image
+  Image<eWrite> dst; // the output image
+
+  param:
+   
+
+    // Tonescale select
+    bool inverse;
+    // OpenDRT tonescale parameters
+    float n;
+    float nr;
+    float g;
+    float w;
+    float t_1;
+
+  local:
+    // constants
+  void define()
+  {
+
+  }
+
+
+  // get the y value of f(x) where the fuction is defined as a line between two points
+  // the two points as passed as an array [a.x, a.y, b.x, b.y]
+  float lerp1D( float4 table, float x)
+  {
+    float m = (table.w-table.y) / (table.z-table.x);
+    float c = table.y - (m*table.x);
+    float y = x*m+c;
+    return y;
+  }
+
+
+  // "safe" power function to avoid NANs or INFs when taking a fractional power of a negative base
+  // this one initially retured -pow(abs(b), e) for negative b
+  // but this ended up producing undesirable results in some cases
+  // so now it just returns 0.0 instead
+  float spow( float base, float exponent )
+  {
+    if(base < 0.0f && exponent != floor(exponent) )
+    {
+      return 0.0f;
+    }
+    else
+    {
+     return pow(base, exponent); 
+    }
+  }
+
+
+  // clamp the components of a 3D vector between a min & max value
+  float3 clamp3(float3 v, float min, float max)
+  {
+    v.x = clamp(v.x, min, max);
+    v.y = clamp(v.y, min, max);
+    v.z = clamp(v.z, min, max);
+    return v;
+  }
+
+
+
+  float forwardDanieleCompressionCurve(float x)
+  {
+      float m = n / nr;
+      float s_1 = w * pow(m,1.0f/g);
+
+      // Ref Version
+      float f = pow(((max(0.0f,x))/(x+s_1)),g)*m;
+      float h = max(0.0f,((pow(f,2.0f))/(f+t_1)));
+
+
+      return h;
+  }
+
+  float inverseDanieleCompressionCurve(float x)
+  {
+        float m = n / nr;
+        float s_1 = w * pow(m,1.0f/g);
+        
+        // inverted version of forwardDanieleCompressionCurve
+        float new_f = 0.5f * (x + sqrt(x) * sqrt(4 * t_1 + x));
+        float new_x =  pow(new_f/m, 1.0f/g) * s_1 / (1.0f-pow(new_f/m, 1.0f/g)); ;
+
+        // pow(  x/ (x+s_1) , g ) * m;
+
+
+      return new_x;
+  }
+
+
+  void init()
+  {
+    
+  }
+
+
+  void process()
+  {
+    SampleType(src) source = src();
+    float3 srcRGB(source.x, source.y, source.z);
+    float3 mappedVals;
+    if(!inverse)
+    {
+        mappedVals.x = forwardDanieleCompressionCurve(source.x);
+        mappedVals.y = forwardDanieleCompressionCurve(source.y);
+        mappedVals.z = forwardDanieleCompressionCurve(source.z);
+    }
+    else
+    {
+        mappedVals.x = inverseDanieleCompressionCurve(source.x);
+        mappedVals.y = inverseDanieleCompressionCurve(source.y);
+        mappedVals.z = inverseDanieleCompressionCurve(source.z);
+    }
+
+
+    float3 dstRGB;
+
+    dst() = float4(mappedVals.x, mappedVals.y, mappedVals.z, source.w); 
+  }
+};

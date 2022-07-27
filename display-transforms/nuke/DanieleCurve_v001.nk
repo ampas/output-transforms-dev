@@ -1,0 +1,155 @@
+#! /Applications/Nuke13.0v3/Nuke13.0v3.app/Contents/MacOS/libnuke-13.0.3.dylib -nx
+version 13.0 v3
+define_window_layout_xml {<?xml version="1.0" encoding="UTF-8"?>
+<layout version="1.0">
+    <window x="1" y="25" w="3008" h="1562" maximized="1" screen="0">
+        <splitter orientation="1">
+            <split size="40"/>
+            <dock id="" hideTitles="1" activePageId="Toolbar.1">
+                <page id="Toolbar.1"/>
+            </dock>
+            <split size="2345" stretch="1"/>
+            <splitter orientation="2">
+                <split size="905"/>
+                <dock id="" activePageId="Viewer.1">
+                    <page id="Viewer.1"/>
+                </dock>
+                <split size="637"/>
+                <dock id="" activePageId="DAG.1" focus="true">
+                    <page id="DAG.1"/>
+                    <page id="Curve Editor.1"/>
+                    <page id="DopeSheet.1"/>
+                </dock>
+            </splitter>
+            <split size="615"/>
+            <dock id="" activePageId="Properties.1">
+                <page id="Properties.1"/>
+                <page id="uk.co.thefoundry.backgroundrenderview.1"/>
+            </dock>
+        </splitter>
+    </window>
+</layout>
+}
+Root {
+ inputs 0
+ name /Users/afry/GitHub/priikone-aces-display-transforms/DanieleCurve_v001.nk
+ frame 4
+ last_frame 77
+ lock_range true
+ format "2048 1556 0 0 2048 1556 1 2K_Super_35(full-ap)"
+ proxy_type scale
+ proxy_format "1024 778 0 0 1024 778 1 1K_Super_35(full-ap)"
+ colorManagement Nuke
+ OCIO_config custom
+ customOCIOConfigPath /Users/afry/Documents/GitHub/OpenColorIO-Configs/aces_1.2/config.ocio
+ workingSpaceLUT linear
+ monitorLut sRGB
+ monitorOutLUT rec709
+ int8Lut sRGB
+ int16Lut sRGB
+ logLut Cineon
+ floatLut linear
+}
+Expression {
+ inputs 0
+ temp_name0 L_min
+ temp_expr0 -12
+ temp_name1 L_max
+ temp_expr1 12
+ channel0 rgba
+ expr0 (2**((x/width)*(L_max-L_min)+L_min)*0.18)
+ name Expression1
+ xpos 125
+ ypos -132
+}
+BlinkScript {
+ kernelSourceFile /Users/afry/GitHub/ACES_ODT_Candidates/blink/danieleCompressionCurve.blink
+ recompileCount 73
+ KernelDescription "2 \"danielleCompressionCurveKernel\" iterate pixelWise bde5591e61f2013f6f1687a0742d27bfb6cd5f785970613de78f245bcdd1ea70 2 \"src\" Read Point \"dst\" Write Point 6 \"inverse\" Bool 1 AA== \"n\" Float 1 AAAAAA== \"nr\" Float 1 AAAAAA== \"g\" Float 1 AAAAAA== \"w\" Float 1 AAAAAA== \"t_1\" Float 1 AAAAAA== 6 \"inverse\" 1 1 \"n\" 1 1 \"nr\" 1 1 \"g\" 1 1 \"w\" 1 1 \"t_1\" 1 1 0"
+ kernelSource "\nkernel danielleCompressionCurveKernel : ImageComputationKernel<ePixelWise>\n\{\n  Image<eRead, eAccessPoint, eEdgeClamped> src; // the input image\n  Image<eWrite> dst; // the output image\n\n  param:\n   \n\n    // Tonescale select\n    bool inverse;\n    // OpenDRT tonescale parameters\n    float n;\n    float nr;\n    float g;\n    float w;\n    float t_1;\n\n  local:\n    // constants\n  void define()\n  \{\n\n  \}\n\n\n  // get the y value of f(x) where the fuction is defined as a line between two points\n  // the two points as passed as an array \[a.x, a.y, b.x, b.y]\n  float lerp1D( float4 table, float x)\n  \{\n    float m = (table.w-table.y) / (table.z-table.x);\n    float c = table.y - (m*table.x);\n    float y = x*m+c;\n    return y;\n  \}\n\n\n  // \"safe\" power function to avoid NANs or INFs when taking a fractional power of a negative base\n  // this one initially retured -pow(abs(b), e) for negative b\n  // but this ended up producing undesirable results in some cases\n  // so now it just returns 0.0 instead\n  float spow( float base, float exponent )\n  \{\n    if(base < 0.0f && exponent != floor(exponent) )\n    \{\n      return 0.0f;\n    \}\n    else\n    \{\n     return pow(base, exponent); \n    \}\n  \}\n\n\n  // clamp the components of a 3D vector between a min & max value\n  float3 clamp3(float3 v, float min, float max)\n  \{\n    v.x = clamp(v.x, min, max);\n    v.y = clamp(v.y, min, max);\n    v.z = clamp(v.z, min, max);\n    return v;\n  \}\n\n\n\n  float forwardDanieleCompressionCurve(float x)\n  \{\n      float m = n / nr;\n      float s_1 = w * pow(m,1.0f/g);\n\n      // Ref Version\n      float f = pow(((max(0.0f,x))/(x+s_1)),g)*m;\n      float h = max(0.0f,((pow(f,2.0f))/(f+t_1)));\n\n\n      return h;\n  \}\n\n  float inverseDanieleCompressionCurve(float x)\n  \{\n        float m = n / nr;\n        float s_1 = w * pow(m,1.0f/g);\n        \n        // inverted version of forwardDanieleCompressionCurve\n        float new_f = 0.5f * (x + sqrt(x) * sqrt(4 * t_1 + x));\n        float new_x =  pow(new_f/m, 1.0f/g) * s_1 / (1.0f-pow(new_f/m, 1.0f/g)); ;\n\n        // pow(  x/ (x+s_1) , g ) * m;\n\n\n      return new_x;\n  \}\n\n\n  void init()\n  \{\n    \n  \}\n\n\n  void process()\n  \{\n    SampleType(src) source = src();\n    float3 srcRGB(source.x, source.y, source.z);\n    float3 mappedVals;\n    if(!inverse)\n    \{\n        mappedVals.x = forwardDanieleCompressionCurve(source.x);\n        mappedVals.y = forwardDanieleCompressionCurve(source.y);\n        mappedVals.z = forwardDanieleCompressionCurve(source.z);\n    \}\n    else\n    \{\n        mappedVals.x = inverseDanieleCompressionCurve(source.x);\n        mappedVals.y = inverseDanieleCompressionCurve(source.y);\n        mappedVals.z = inverseDanieleCompressionCurve(source.z);\n    \}\n\n\n    float3 dstRGB;\n\n    dst() = float4(mappedVals.x, mappedVals.y, mappedVals.z, source.w); \n  \}\n\};\n"
+ useGPUIfAvailable false
+ rebuild ""
+ danielleCompressionCurveKernel_n 100
+ danielleCompressionCurveKernel_nr 100
+ danielleCompressionCurveKernel_g 1.2
+ danielleCompressionCurveKernel_w 1
+ danielleCompressionCurveKernel_t_1 0.05
+ rebuild_finalise ""
+ name BlinkScript1
+ xpos 125
+ ypos -62
+}
+set N375e5400 [stack 0]
+BlinkScript {
+ kernelSourceFile /Users/afry/GitHub/ACES_ODT_Candidates/blink/danieleCompressionCurve.blink
+ recompileCount 88
+ KernelDescription "2 \"danielleCompressionCurveKernel\" iterate pixelWise bde5591e61f2013f6f1687a0742d27bfb6cd5f785970613de78f245bcdd1ea70 2 \"src\" Read Point \"dst\" Write Point 6 \"inverse\" Bool 1 AA== \"n\" Float 1 AAAAAA== \"nr\" Float 1 AAAAAA== \"g\" Float 1 AAAAAA== \"w\" Float 1 AAAAAA== \"t_1\" Float 1 AAAAAA== 6 \"inverse\" 1 1 \"n\" 1 1 \"nr\" 1 1 \"g\" 1 1 \"w\" 1 1 \"t_1\" 1 1 0"
+ kernelSource "\nkernel danielleCompressionCurveKernel : ImageComputationKernel<ePixelWise>\n\{\n  Image<eRead, eAccessPoint, eEdgeClamped> src; // the input image\n  Image<eWrite> dst; // the output image\n\n  param:\n   \n\n    // Tonescale select\n    bool inverse;\n    // OpenDRT tonescale parameters\n    float n;\n    float nr;\n    float g;\n    float w;\n    float t_1;\n\n  local:\n    // constants\n  void define()\n  \{\n\n  \}\n\n\n  // get the y value of f(x) where the fuction is defined as a line between two points\n  // the two points as passed as an array \[a.x, a.y, b.x, b.y]\n  float lerp1D( float4 table, float x)\n  \{\n    float m = (table.w-table.y) / (table.z-table.x);\n    float c = table.y - (m*table.x);\n    float y = x*m+c;\n    return y;\n  \}\n\n\n  // \"safe\" power function to avoid NANs or INFs when taking a fractional power of a negative base\n  // this one initially retured -pow(abs(b), e) for negative b\n  // but this ended up producing undesirable results in some cases\n  // so now it just returns 0.0 instead\n  float spow( float base, float exponent )\n  \{\n    if(base < 0.0f && exponent != floor(exponent) )\n    \{\n      return 0.0f;\n    \}\n    else\n    \{\n     return pow(base, exponent); \n    \}\n  \}\n\n\n  // clamp the components of a 3D vector between a min & max value\n  float3 clamp3(float3 v, float min, float max)\n  \{\n    v.x = clamp(v.x, min, max);\n    v.y = clamp(v.y, min, max);\n    v.z = clamp(v.z, min, max);\n    return v;\n  \}\n\n\n\n  float forwardDanieleCompressionCurve(float x)\n  \{\n      float m = n / nr;\n      float s_1 = w * pow(m,1.0f/g);\n\n      // Ref Version\n      float f = pow(((max(0.0f,x))/(x+s_1)),g)*m;\n      float h = max(0.0f,((pow(f,2.0f))/(f+t_1)));\n\n\n      return h;\n  \}\n\n  float inverseDanieleCompressionCurve(float x)\n  \{\n        float m = n / nr;\n        float s_1 = w * pow(m,1.0f/g);\n        \n        // inverted version of forwardDanieleCompressionCurve\n        float new_f = 0.5f * (x + sqrt(x) * sqrt(4 * t_1 + x));\n        float new_x =  pow(new_f/m, 1.0f/g) * s_1 / (1.0f-pow(new_f/m, 1.0f/g)); ;\n\n        // pow(  x/ (x+s_1) , g ) * m;\n\n\n      return new_x;\n  \}\n\n\n  void init()\n  \{\n    \n  \}\n\n\n  void process()\n  \{\n    SampleType(src) source = src();\n    float3 srcRGB(source.x, source.y, source.z);\n    float3 mappedVals;\n    if(!inverse)\n    \{\n        mappedVals.x = forwardDanieleCompressionCurve(source.x);\n        mappedVals.y = forwardDanieleCompressionCurve(source.y);\n        mappedVals.z = forwardDanieleCompressionCurve(source.z);\n    \}\n    else\n    \{\n        mappedVals.x = inverseDanieleCompressionCurve(source.x);\n        mappedVals.y = inverseDanieleCompressionCurve(source.y);\n        mappedVals.z = inverseDanieleCompressionCurve(source.z);\n    \}\n\n\n    float3 dstRGB;\n\n    dst() = float4(mappedVals.x, mappedVals.y, mappedVals.z, source.w); \n  \}\n\};\n"
+ useGPUIfAvailable false
+ rebuild ""
+ danielleCompressionCurveKernel_inverse true
+ danielleCompressionCurveKernel_n 100
+ danielleCompressionCurveKernel_nr 100
+ danielleCompressionCurveKernel_g 1.2
+ danielleCompressionCurveKernel_w 1
+ danielleCompressionCurveKernel_t_1 0.05
+ rebuild_finalise ""
+ name BlinkScript2
+ xpos 125
+ ypos -30
+}
+set N9ff6a400 [stack 0]
+push $N375e5400
+Viewer {
+ inputs 2
+ frame_range 1-77
+ colour_sample_bbox {0.0341796875 -0.1083984375 0.03515625 -0.107421875}
+ gl_buffer_depth half-float
+ viewerProcess None
+ name Viewer1
+ xpos 18
+ ypos 88
+}
+Ramp {
+ inputs 0
+ p0 {0 0}
+ p1 {{width-1} 0}
+ name Ramp1
+ xpos 31
+ ypos -129
+}
+push $N9ff6a400
+Colorspace {
+ primary_in ACES
+ colorspace_out sRGB
+ primary_out DCI-P3
+ name Colorspace1
+ xpos 271
+ ypos 44
+}
+push $N9ff6a400
+Expression {
+ expr0 "y==floor(r(x, pos.y)*height*mult)?1:0"
+ expr1 "y==floor(g(x, pos.y)*height*mult)?1:0"
+ expr2 "y==floor(b(x, pos.y)*height*mult)?1:0"
+ channel3 alpha
+ name PlotScanline3
+ xpos 125
+ ypos 56
+ addUserKnob {20 User}
+ addUserKnob {12 pos}
+ addUserKnob {7 mult R 0 5}
+ mult 1
+}
+Read {
+ inputs 0
+ file_type exr
+ file /Users/afry/GitHub/ACES_ODT_SampleFrames/ACES_OT_VWG_SampleFrames/ACES_OT_VWG_SampleFrames.####.exr
+ format "1920 1080 0 0 1920 1080 1 HD_1080"
+ last 77
+ origlast 77
+ origset true
+ name Read1
+ xpos 126
+ ypos -263
+}
