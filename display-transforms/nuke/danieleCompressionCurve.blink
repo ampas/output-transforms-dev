@@ -65,7 +65,8 @@ kernel danielleCompressionCurveKernel : ImageComputationKernel<ePixelWise>
 
   float forwardDanieleCompressionCurve(float x)
   {
-      float m = n / nr;
+      float m0 = n / nr;
+      float m  = 0.5f * ( m0 + sqrt(m0 * ( m0 + 4 * t_1 ) ) ) ;
       float s_1 = w * pow(m,1.0f/g);
 
       // Ref Version
@@ -78,7 +79,8 @@ kernel danielleCompressionCurveKernel : ImageComputationKernel<ePixelWise>
 
   float inverseDanieleCompressionCurve(float x)
   {
-        float m = n / nr;
+        float m0 = n / nr;
+        float m  = 0.5f * ( m0 + sqrt(m0 * ( m0 + 4 * t_1 ) ) ) ;
         float s_1 = w * pow(m,1.0f/g);
         
         // inverted version of forwardDanieleCompressionCurve
