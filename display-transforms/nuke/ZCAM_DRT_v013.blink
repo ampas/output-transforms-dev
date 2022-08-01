@@ -1041,39 +1041,37 @@ kernel DRT_ZCAM_Kernel : ImageComputationKernel<ePixelWise>
 
   float forwardDanieleCompressionCurve(float x)
   {
-      float m = n / nr;
+      float m0 = n / nr;
+      float m  = 0.5f * ( m0 + sqrt(m0 * ( m0 + 4 * t_1 ) ) ) ;
       float s_1 = w * pow(m,1.0f/g);
 
       // Scale Data
-    //   x = x / n;
+      //   x = x / n;
 
       // Ref Version
       float f = pow(((max(0.0f,x))/(x+s_1)),g)*m;
       float h = max(0.0f,((pow(f,2.0f))/(f+t_1)));
       
       //  Scale Data
-    //   h = h * n;
+      //   h = h * n;
 
       return h;
   }
 
   float inverseDanieleCompressionCurve(float x)
   {
-        float m = n / nr;
-        float s_1 = w * pow(m,1.0f/g);
-        
-        // inverted version of forwardDanieleCompressionCurve
+      float m0 = n / nr;
+      float m  = 0.5f * ( m0 + sqrt(m0 * ( m0 + 4 * t_1 ) ) ) ;
+      float s_1 = w * pow(m,1.0f/g);
+      
+      // inverted version of forwardDanieleCompressionCurve
 
 
+      float new_f = 0.5f * (x + sqrt(x) * sqrt(4 * t_1 + x));
+      float new_x =  pow(new_f/m, 1.0f/g) * s_1 / (1.0f-pow(new_f/m, 1.0f/g)); ;
 
-        // // Scale Data
-        //  x = x / n;
-
-        float new_f = 0.5f * (x + sqrt(x) * sqrt(4 * t_1 + x));
-        float new_x =  pow(new_f/m, 1.0f/g) * s_1 / (1.0f-pow(new_f/m, 1.0f/g)); ;
-
-        // // Rescale data down
-        // x = x * n;
+      // // Rescale data down
+      // x = x * n;
 
       return new_x;
   }
@@ -1347,7 +1345,7 @@ kernel DRT_ZCAM_Kernel : ImageComputationKernel<ePixelWise>
       }
       else if( toneScaleMode == 2 )
       {
-        linear = inverseDanieleCompressionCurve(luminance);
+        linear = inverseDanieleCompressionCurve(luminance/mmScaleFactor);
       }
       else
       {
