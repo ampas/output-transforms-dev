@@ -2,7 +2,7 @@
 version 13.0 v3
 define_window_layout_xml {<?xml version="1.0" encoding="UTF-8"?>
 <layout version="1.0">
-    <window x="0" y="25" w="2560" h="1470" maximized="1" screen="0">
+    <window x="0" y="117" w="2560" h="1470" screen="0">
         <splitter orientation="1">
             <split size="40"/>
             <dock id="" hideTitles="1" activePageId="Toolbar.1">
@@ -11,8 +11,9 @@ define_window_layout_xml {<?xml version="1.0" encoding="UTF-8"?>
             <split size="1897" stretch="1"/>
             <splitter orientation="2">
                 <split size="851"/>
-                <dock id="" activePageId="Viewer.1">
+                <dock id="" activePageId="Viewer.2">
                     <page id="Viewer.1"/>
+                    <page id="Viewer.2"/>
                 </dock>
                 <split size="599"/>
                 <dock id="" activePageId="DAG.1" focus="true">
@@ -33,6 +34,7 @@ define_window_layout_xml {<?xml version="1.0" encoding="UTF-8"?>
 Root {
  inputs 0
  name /Users/afry/GitHub/output-transforms-dev/display-transforms/nuke/DanieleCurve_v001.nk
+ frame 76
  format "2048 1556 0 0 2048 1556 1 2K_Super_35(full-ap)"
  proxy_type scale
  proxy_format "1024 778 0 0 1024 778 1 1K_Super_35(full-ap)"
@@ -68,6 +70,20 @@ Dot {
  ypos -65
 }
 set N624cb400 [stack 0]
+Expression {
+ expr0 "y==floor(r(x, pos.y)*height*mult)?1:0"
+ expr1 "y==floor(g(x, pos.y)*height*mult)?1:0"
+ expr2 "y==floor(b(x, pos.y)*height*mult)?1:0"
+ channel3 alpha
+ name PlotScanline2
+ xpos 600
+ ypos 1
+ addUserKnob {20 User}
+ addUserKnob {12 pos}
+ addUserKnob {7 mult R 0 5}
+ mult 1
+}
+push $N624cb400
 BlinkScript {
  kernelSourceFile /Users/afry/GitHub/output-transforms-dev/display-transforms/nuke/danieleCompressionCurve.blink
  recompileCount 75
@@ -86,6 +102,32 @@ BlinkScript {
  ypos -32
 }
 set N230de000 [stack 0]
+Expression {
+ expr0 "y==floor(r(x, pos.y)*height*mult)?1:0"
+ expr1 "y==floor(g(x, pos.y)*height*mult)?1:0"
+ expr2 "y==floor(b(x, pos.y)*height*mult)?1:0"
+ channel3 alpha
+ name PlotScanline3
+ xpos 601
+ ypos 44
+ addUserKnob {20 User}
+ addUserKnob {12 pos}
+ addUserKnob {7 mult R 0 5}
+ mult 1
+}
+push $N230dc800
+Expression {
+ temp_name0 L_min
+ temp_expr0 -12
+ temp_name1 L_max
+ temp_expr1 12
+ channel0 rgba
+ expr0 (2**((x/width)*(L_max-L_min)+L_min)*0.18)
+ name Expression1
+ xpos 768
+ ypos -130
+}
+push $N230de000
 BlinkScript {
  kernelSourceFile /Users/afry/GitHub/output-transforms-dev/display-transforms/nuke/danieleCompressionCurve.blink
  recompileCount 90
@@ -104,44 +146,23 @@ BlinkScript {
  xpos 773
 }
 set N230ddc00 [stack 0]
-push $N230de000
+Colorspace {
+ primary_in ACES
+ colorspace_out sRGB
+ primary_out DCI-P3
+ name Colorspace1
+ xpos 919
+ ypos 88
+}
 Viewer {
- inputs 2
- frame_range 1-77
- colour_sample_bbox {0.0341796875 -0.1083984375 0.03515625 -0.107421875}
+ inputs 0
+ frame 76
+ frame_range 1-100
  gl_buffer_depth half-float
  viewerProcess None
- name Viewer2
- xpos 722
- ypos 165
-}
-push $N624cb400
-Expression {
- expr0 "y==floor(r(x, pos.y)*height*mult)?1:0"
- expr1 "y==floor(g(x, pos.y)*height*mult)?1:0"
- expr2 "y==floor(b(x, pos.y)*height*mult)?1:0"
- channel3 alpha
- name PlotScanline2
- xpos 600
- ypos 1
- addUserKnob {20 User}
- addUserKnob {12 pos}
- addUserKnob {7 mult R 0 5}
- mult 1
-}
-push $N230de000
-Expression {
- expr0 "y==floor(r(x, pos.y)*height*mult)?1:0"
- expr1 "y==floor(g(x, pos.y)*height*mult)?1:0"
- expr2 "y==floor(b(x, pos.y)*height*mult)?1:0"
- channel3 alpha
- name PlotScanline3
- xpos 601
- ypos 44
- addUserKnob {20 User}
- addUserKnob {12 pos}
- addUserKnob {7 mult R 0 5}
- mult 1
+ name Viewer1
+ xpos -40
+ ypos -9
 }
 push $N230ddc00
 Expression {
@@ -151,53 +172,34 @@ Expression {
  channel3 alpha
  name PlotScanline1
  xpos 599
- ypos 90
+ ypos 91
  addUserKnob {20 User}
  addUserKnob {12 pos}
  addUserKnob {7 mult R 0 5}
  mult 1
 }
-set N624cbc00 [stack 0]
-push $N624cbc00
-Viewer {
- inputs 2
- frame 1
- frame_range 1-100
- gl_buffer_depth half-float
- name Viewer1
- xpos -40
- ypos -9
-}
-push $N230dc800
 Expression {
- temp_name0 L_min
- temp_expr0 -12
- temp_name1 L_max
- temp_expr1 12
- channel0 rgba
- expr0 (2**((x/width)*(L_max-L_min)+L_min)*0.18)
- name Expression1
- xpos 768
- ypos -130
-}
-Read {
  inputs 0
- file_type exr
- file /Users/afry/GitHub/ACES_ODT_SampleFrames/ACES_OT_VWG_SampleFrames/ACES_OT_VWG_SampleFrames.####.exr
- format "1920 1080 0 0 1920 1080 1 HD_1080"
- last 77
- origlast 77
- origset true
- name Read1
- xpos 930
- ypos -245
+ expr0 "y==floor(r(x, pos.y)*height*mult)?1:0"
+ expr1 "y==floor(g(x, pos.y)*height*mult)?1:0"
+ expr2 "y==floor(b(x, pos.y)*height*mult)?1:0"
+ channel3 alpha
+ name PlotScanline4
+ xpos 1260
+ ypos -8
+ addUserKnob {20 User}
+ addUserKnob {12 pos}
+ addUserKnob {7 mult R 0 5}
+ mult 1
 }
-push $N230ddc00
-Colorspace {
- primary_in ACES
- colorspace_out sRGB
- primary_out DCI-P3
- name Colorspace1
- xpos 919
- ypos 88
+Viewer {
+ inputs 0
+ frame 76
+ frame_range 1-77
+ colour_sample_bbox {0.0341796875 -0.1083984375 0.03515625 -0.107421875}
+ gl_buffer_depth half-float
+ viewerProcess None
+ name Viewer2
+ xpos 722
+ ypos 165
 }
