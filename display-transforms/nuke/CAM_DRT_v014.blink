@@ -1518,7 +1518,7 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
     // float IzMid   = luminanceToIz(0.18f * referenceLuminance);
     // float IzMidTS = luminanceToIz(sstsLuminance.y);
     float IzMid   = 0.18f;
-    float IzMidTS = sstsLuminance.y/100.0f;
+    float IzMidTS = sstsLuminance.y/referenceLuminance;
 
     float IzAligned = Iz + IzMidTS - IzMid;
 
@@ -1537,26 +1537,30 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
     float3 luminanceRGB = encodingToLuminance3( encodingIn, inputRGB);
     float3 luminanceXYZ = vector_dot(RGB_to_XYZ_input, luminanceRGB);
 
-
     // // assuming 'fully adapted', dark' viewing conditions for input image (does that make sense?)
     // float3 Izazbz =  XYZ_to_Izazbz(apply_CAT(luminanceXYZ, inWhite, d65White, catType, 1.0f));
     // // return apply_CAT(luminanceXYZ, inWhite, d65White, catType, 1.0f);
     // float3 refWhiteIzazbz = XYZ_to_Izazbz(refWhite*referenceLuminance/refWhite.y);
     // float3 colorJMh = Izazbz_to_JMh(Izazbz, refWhiteIzazbz.x, 0);
 
+    float3 JMh = XYZ_to_JMh(luminanceXYZ, refWhite, d65White, viewingConditions);
 
-    if ( camMode == 0 )
-    {
-        float3 refWhiteIzazbz = XYZ_to_Izazbz(refWhite*referenceLuminance/refWhite.y);
-        return Izazbz_to_JMh(XYZ_to_Izazbz(apply_CAT(luminanceXYZ, refWhite, d65White, catType, cat_adaptDegree)), refWhiteIzazbz.x, viewingConditions);
-    }
-    else if( camMode == 1 )
-    {
-        // return float3(1.0f,2.0f,3.0f);
-        return XYZ_to_Hellwig2022_JMh(luminanceXYZ, XYZ_w, L_A, Y_b,surround,discount_illuminant);
-    }
+    return JMh;
 
-    // return colorJMh;
+  }
+
+
+
+  float3 JMh_to_input_RGB(float3 JMh)
+  {
+
+
+    float3 luminanceXYZ = JMh_to_XYZ( JMh, refWhite, d65White, viewingConditions );
+    float3 luminanceRGB = vector_dot(XYZ_to_RGB_input, luminanceXYZ);
+    float3 inputRGB = luminanceToEncoding3( encodingIn, luminanceRGB);
+
+
+    return inputRGB;
 
   }
 
@@ -1579,7 +1583,7 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
     float3 monoJMh = float3(inputJMh.x,0.0f,0.0f);
 
     float3 linearJMh = JMh_to_luminance_RGB(monoJMh);
-    float linear = linearJMh.x/100.0f;
+    float linear = linearJMh.x/referenceLuminance;
 
     // float3 monoIzazbz = JMh_to_Izazbz(colorJMh, refWhiteIzazbz.x, 0);
     // float3 monoXYZ = Izazbz_to_XYZ(monoIzazbz);
@@ -1601,28 +1605,8 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
     }
 
 
-    // float IzTS = luminanceToIz(luminanceTS);
-
-    // float3 outputIzazbz = inputIzazbz;
-
-    // if( applyTonecurve )
-    // {
-    //   outputIzazbz.x = IzTS;
-    // }
-
-    // // convert the result to JMh
-    // float3 outputJMh = Izazbz_to_JMh(outputIzazbz, refWhiteIzazbz.x, 0);
-
-    // if( applyHighlightDesat )
-    // {
-    //   float factM = highlightDesatFactor(inputIzazbz.x, IzTS);
-    //   outputJMh.y = outputJMh.y * factM;
-    // }
-
     float3 tonemappedmonoJMh = luminance_RGB_to_JMh(float3(luminanceTS,luminanceTS,luminanceTS));
     float3 tonemappedJMh = float3(tonemappedmonoJMh.x,inputJMh.y,inputJMh.z);
-
-    // float3 = outputJMh
 
     // return outputJMh;
     if( applyTonecurve )
@@ -1634,7 +1618,8 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
         outputJMh = inputJMh;
     }
 
-    float factM = highlightDesatFactor(linear, luminanceTS/100);
+    // Apply highlight desat
+    float factM = highlightDesatFactor(linear, luminanceTS/referenceLuminance);
     if( applyHighlightDesat )
     {
 
@@ -1649,15 +1634,31 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
   float3 inverseTonescale( float3 JMh )
   {
     float3 refWhiteIzazbz = XYZ_to_Izazbz(refWhite*referenceLuminance/refWhite.y);
-    float3 Izazbz = JMh_to_Izazbz(JMh, refWhiteIzazbz.x, 0);
+    // float3 Izazbz = JMh_to_Izazbz(JMh, refWhiteIzazbz.x, 0);
+
+    float3 tonemappedJMh = JMh;
 
     if( ! applyTonecurve && ! applyHighlightDesat )
     {
       // nothing else to do here
-      return Izazbz;
+      return tonemappedJMh;
     }
 
-    float luminance = IzToLuminance(Izazbz.x);
+    float3 untonemappedColourJMh = tonemappedJMh;
+
+    
+    // float luminance = IzToLuminance(Izazbz.x);
+
+    float3 monoTonemappedJMh = float3(tonemappedJMh.x,0.0f,0.0f);
+    float3 monoTonemappedRGB = JMh_to_luminance_RGB(monoTonemappedJMh);
+    float3 newMonoTonemappedJMh = luminance_RGB_to_JMh(monoTonemappedRGB);
+    float luminance = monoTonemappedRGB.x;
+
+    float3 tonemappedRGB = JMh_to_luminance_RGB(tonemappedJMh);
+    float3 newTonemappedJMh = luminance_RGB_to_JMh(tonemappedRGB);
+
+    // newTonemappedJMh.x = newTonemappedJMh.x * 2.0f;
+
 
     // Dummy value to init the var
     float linear = 50.0f;
@@ -1674,38 +1675,26 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
     {
         linear = inverseSSTS(luminance, ssts_paramMin, ssts_paramMid, ssts_paramMax);
     }
- 
-    
-    
-    float Iz = luminanceToIz(linear*referenceLuminance);
 
-    if( applyHighlightDesat )
-    {
-      float factM = highlightDesatFactor(Iz, Izazbz.x);
-      JMh.y = JMh.y / factM;
-      Izazbz = JMh_to_Izazbz(JMh, refWhiteIzazbz.x, 0);
-      luminance = IzToLuminance(Izazbz.x);
-      if( toneScaleMode == 1 )
-      {
-        linear = inverseMmTonescale(luminance/mmScaleFactor);
-      }
-      else if( toneScaleMode == 2 )
-      {
-        linear = inverseDanieleCompressionCurve(luminance/mmScaleFactor);
-      }
-      else
-      {
-        linear = inverseSSTS(luminance, ssts_paramMin, ssts_paramMid, ssts_paramMax);
-      }
-      Iz = luminanceToIz(linear*referenceLuminance);
-    }
-
+    linear = linear*referenceLuminance;
+  
     if( applyTonecurve )
     {
-      Izazbz.x = Iz;
+      float3 untonemappedMonoJMh = luminance_RGB_to_JMh(float3(linear,linear,linear));
+      untonemappedColourJMh = float3(untonemappedMonoJMh.x,tonemappedJMh.y,tonemappedJMh.z);
+    }
+ 
+
+    // Apply highlight desat
+    // I think there is bug here if you apply desat, but no tonecurve in the forward direction.
+    float factM = highlightDesatFactor(linear/referenceLuminance, luminance/referenceLuminance);
+    if( applyHighlightDesat && applyTonecurve )
+    {
+      untonemappedColourJMh.y = untonemappedColourJMh.y / factM;
     }
 
-    return Izazbz;
+
+    return  untonemappedColourJMh;
   }
 
 
@@ -2216,8 +2205,10 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
       dstRGB = JMh_to_output_RGB(compressedJMh);
       // diagnostic = Izazbz_to_JMh(inputIzazbz, 0.31334f, 0);
 
-      float3 testA = XYZ_to_JMh( srcRGB, refWhite, d65White, viewingConditions );
-      float3 testB = JMh_to_XYZ( testA, refWhite, d65White, viewingConditions );
+      // float3 testA = input_RGB_to_JMh(srcRGB);
+      // float3 testB = forwardTonescale(testA);
+      // float3 testC = inverseTonescale(testB);
+      // float3 testD = JMh_to_input_RGB(testC);
 
       diagnostic =  dstRGB;
     }
