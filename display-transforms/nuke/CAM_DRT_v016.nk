@@ -77,6 +77,8 @@ Group {
  addUserKnob {41 DRT_CAM_Kernel_gxy l gxy T BlinkScript1.DRT_CAM_Kernel_gxy}
  addUserKnob {41 DRT_CAM_Kernel_bxy l bxy T BlinkScript1.DRT_CAM_Kernel_bxy}
  addUserKnob {41 DRT_CAM_Kernel_wxy l wxy T BlinkScript1.DRT_CAM_Kernel_wxy}
+ addUserKnob {26 _3 l "Linear Extension breakpoint"}
+ addUserKnob {41 DRT_CAM_Kernel_L_B l L_B T BlinkScript1.DRT_CAM_Kernel_L_B}
  addUserKnob {26 "" +STARTLINE}
  addUserKnob {26 direction_div l Direction}
  addUserKnob {6 invert t "apply the pseudo-inverse transform" +STARTLINE}

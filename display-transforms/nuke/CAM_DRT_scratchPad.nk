@@ -2,22 +2,22 @@
 version 13.0 v3
 define_window_layout_xml {<?xml version="1.0" encoding="UTF-8"?>
 <layout version="1.0">
-    <window x="0" y="25" w="2560" h="1470" screen="0">
+    <window x="0" y="25" w="2048" h="1150" maximized="1" screen="0">
         <splitter orientation="1">
             <split size="40"/>
             <dock id="" hideTitles="1" activePageId="Toolbar.1">
                 <page id="Toolbar.1"/>
             </dock>
-            <split size="1897" stretch="1"/>
+            <split size="1385" stretch="1"/>
             <splitter orientation="2">
-                <split size="851"/>
+                <split size="663"/>
                 <dock id="" activePageId="Viewer.1">
                     <page id="Viewer.1"/>
                     <page id="Viewer.2"/>
                     <page id="Viewer.3"/>
                 </dock>
-                <split size="599"/>
-                <dock id="" activePageId="DAG.1" focus="true">
+                <split size="467"/>
+                <dock id="" activePageId="DAG.1">
                     <page id="DAG.1"/>
                     <page id="Curve Editor.1"/>
                     <page id="DopeSheet.1"/>
@@ -26,7 +26,7 @@ define_window_layout_xml {<?xml version="1.0" encoding="UTF-8"?>
                 </dock>
             </splitter>
             <split size="615"/>
-            <dock id="" activePageId="Properties.1">
+            <dock id="" activePageId="Properties.1" focus="true">
                 <page id="Properties.1"/>
                 <page id="uk.co.thefoundry.backgroundrenderview.1"/>
             </dock>
@@ -3648,16 +3648,16 @@ Read {
  origlast 77
  origset true
  name Read1
- xpos 360
- ypos -293
+ xpos 297
+ ypos -300
 }
 AppendClip {
  inputs 3
  meta_from_first false
  time ""
  name AppendClip1
- xpos 324
- ypos -157
+ xpos 297
+ ypos -163
 }
 set N59d7ac00 [stack 0]
 Reformat {
@@ -3763,6 +3763,7 @@ Group {
  name DRT_CAM_Blink1
  label "Input: \[value encoding_in] / \[value primaries_in]\nLimit: \[value primaries_limit] / \[value ssts_luminance.2]nits\nOutput: \[value encoding_out] / \[value primaries_out]\n\[value toneScaleMode]\n\[value camMode]\n\nBodged XYZ_to_LMS_ZCAM matrix\n"
  note_font "Bitstream Vera Sans"
+ selected true
  xpos 297
  ypos 72
  addUserKnob {20 User}
@@ -3834,6 +3835,8 @@ Group {
  addUserKnob {41 DRT_CAM_Kernel_gxy l gxy T BlinkScript1.DRT_CAM_Kernel_gxy}
  addUserKnob {41 DRT_CAM_Kernel_bxy l bxy T BlinkScript1.DRT_CAM_Kernel_bxy}
  addUserKnob {41 DRT_CAM_Kernel_wxy l wxy T BlinkScript1.DRT_CAM_Kernel_wxy}
+ addUserKnob {26 _3 l "Linear Extension breakpoint"}
+ addUserKnob {41 DRT_CAM_Kernel_L_B l L_B T BlinkScript1.DRT_CAM_Kernel_L_B}
  addUserKnob {26 "" +STARTLINE}
  addUserKnob {26 direction_div l Direction}
  addUserKnob {6 invert t "apply the pseudo-inverse transform" +STARTLINE}
