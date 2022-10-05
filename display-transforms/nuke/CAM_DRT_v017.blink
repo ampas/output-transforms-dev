@@ -166,6 +166,8 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
 
     // Toggle Inverse Transform
     bool invert;
+    // Diagnostic path modes
+    int diagnosticMode;
 
     float3x3 XYZ_to_LMS_ZCAM;
     float zcam_rho;
@@ -387,6 +389,32 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
   // so now it just returns 0.0 instead
   float spow( float base, float exponent )
   {
+
+
+    // a = np.atleast_1d(a)
+    float a = base;
+    float b = exponent;
+    // // p = as_float_array(p)
+
+    // float a_p = sign(a) * pow(  fabs(a) ,p)  ; 
+
+    // // a_p[np.isnan(a_p)] = 0
+
+    // return a_p;
+
+    // np.sign(a) * pow(np.abs(a) , b) 
+
+    // float a_p =  sign(a) * pow(fabs(a) , b) ;
+    // if ( isnan(a_p) )
+    // {
+    //     a_p = a_p;
+    // }
+    // else 
+    // {
+    //     a_p = 0.0;
+    // }
+    // return a_p;
+
     if(base < 0.0f && exponent != floor(exponent) )
     {
       return 0.0f;
@@ -1192,7 +1220,21 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
     float3 RGB = vector_dot(MATRIX_16, XYZ);
     float3 RGB_c = D_RGB * RGB;
     float3 F_L_RGB_2 = float3spow(F_L * float3abs(RGB_c) / 100.0f, 0.42f);
-    float3 RGB_a = (400.0f * float3sign(RGB_c) * F_L_RGB_2) / (27.13f + F_L_RGB_2) + 0.1f;
+    // float3 RGB_a = (400.0f * float3sign(RGB_c) * F_L_RGB_2) / (27.13f + F_L_RGB_2) + 0.1f;
+
+
+        // # Step 3
+    // # Applying forward post-adaptation non-linear response compression.
+    float3 RGB_a = post_adaptation_non_linear_response_compression_forward(RGB_c, F_L);
+    // float3 RGB_a = RGB_c;
+    // float3 RGB_a_l = d_post_adaptation_non_linear_response_compression_forward(L_B, F_L) * ( RGB_c - L_B) + post_adaptation_non_linear_response_compression_forward( L_B, F_L );
+
+    // // float3 RGB_d;
+    // RGB_a.x = RGB_c.x < L_B.x ? RGB_a_l.x: RGB_a.x;
+    // RGB_a.y = RGB_c.y < L_B.y ? RGB_a_l.y: RGB_a.y;
+    // RGB_a.z = RGB_c.z < L_B.z ? RGB_a_l.z: RGB_a.z;
+
+
     float R_a = RGB_a.x ;
     float G_a = RGB_a.y ;
     float B_a = RGB_a.z ;
@@ -2965,8 +3007,22 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
 
       // testing 
       // dstRGB = JMh_to_output_RGB(tonemappedJMh);
-
-      diagnostic =  dstRGB;
+      if (diagnosticMode == 0)
+      {        
+        diagnostic =  dstRGB;
+      }
+      else if ( diagnosticMode == 1)
+      {
+        diagnostic =  JMh;
+      }
+      else if ( diagnosticMode == 2)
+      {
+        diagnostic =  tonemappedJMh;
+      }
+      else if ( diagnosticMode == 3)
+      {
+        diagnostic =  compressedJMh;
+      }
     }
 
     dst() = float4(diagnostic.x, diagnostic.y, diagnostic.z, source.w ); 
