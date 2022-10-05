@@ -214,7 +214,7 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
     float3 XYZ_w;
     float L_A;
     float Y_b;
-    float L_B;
+    float3 L_B;
     float3 surround;
     bool discount_illuminant;
 
@@ -1498,10 +1498,10 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
         // float3 RGB_a = RGB_c;
         float3 RGB_a_l = d_post_adaptation_non_linear_response_compression_forward(L_B, F_L) * ( RGB_c - L_B) + post_adaptation_non_linear_response_compression_forward( L_B, F_L );
 
-        float3 RGB_d;
-        RGB_d.x = RGB_c.x < L_B ? RGB_a_l.x: RGB_a.x;
-        RGB_d.y = RGB_c.y < L_B ? RGB_a_l.y: RGB_a.y;
-        RGB_d.z = RGB_c.z < L_B ? RGB_a_l.z: RGB_a.z;
+        // float3 RGB_d;
+        RGB_a.x = RGB_c.x < L_B.x ? RGB_a_l.x: RGB_a.x;
+        RGB_a.y = RGB_c.y < L_B.y ? RGB_a_l.y: RGB_a.y;
+        RGB_a.z = RGB_c.z < L_B.z ? RGB_a_l.z: RGB_a.z;
 
 
 
@@ -1509,9 +1509,9 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
         // # Step 4
         // # Converting to preliminary cartesian coordinates.
         // R_a, G_a, B_a = tsplit(RGB_a)
-        float R_a = RGB_d.x ;
-        float G_a = RGB_d.y ;
-        float B_a = RGB_d.z ;
+        float R_a = RGB_a.x ;
+        float G_a = RGB_a.y ;
+        float B_a = RGB_a.z ;
         // a = R_a - 12 * G_a / 11 + B_a / 11
         float a = R_a - 12.0f * G_a / 11.0f + B_a / 11.0f;
         // b = (R_a + G_a - 2 * B_a) / 9
@@ -1790,16 +1790,14 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
         // ) + L_B
         // RGB_c = np.where(RGB_c < L_B, RGB_c_l, RGB_c)
 
-        // Adding 0.1 here seems to fix the inversion issue, not really clear on why I'm needing to do this
-        RGB_a = RGB_a + 0.1f;
-        float3 RGB_c = post_adaptation_non_linear_response_compression_inverse(RGB_a, F_L);
+        float3 RGB_c = post_adaptation_non_linear_response_compression_inverse(RGB_a + 0.1, F_L);
         // float3 RGB_c = RGB_a;
-        float3 RGB_c_l = ( RGB_a - post_adaptation_non_linear_response_compression_forward( L_B, F_L)) / (d_post_adaptation_non_linear_response_compression_forward( L_B, F_L)) + L_B;
+        float3 RGB_c_l = ( RGB_a + 0.1 - post_adaptation_non_linear_response_compression_forward( L_B, F_L)) / (d_post_adaptation_non_linear_response_compression_forward( L_B, F_L)) + L_B;
 
         float3 RGB_d;
-        RGB_d.x = RGB_c.x < L_B ? RGB_c_l.x : RGB_c.x;
-        RGB_d.y = RGB_c.y < L_B ? RGB_c_l.y : RGB_c.y;
-        RGB_d.z = RGB_c.z < L_B ? RGB_c_l.z : RGB_c.z;
+        RGB_d.x = RGB_c.x < L_B.x ? RGB_c_l.x : RGB_c.x;
+        RGB_d.y = RGB_c.y < L_B.y ? RGB_c_l.y : RGB_c.y;
+        RGB_d.z = RGB_c.z < L_B.z ? RGB_c_l.z : RGB_c.z;
 
 
         // # Step 6
