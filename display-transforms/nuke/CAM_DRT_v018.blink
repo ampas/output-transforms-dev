@@ -1434,9 +1434,22 @@ float3 uncompress(float3 xyz)
         // )
         // RGB_a = np.where(RGB_c < L_B, RGB_a_l, RGB_a)
 
+
+        if (compressMode)
+        {
+          RGB_c = compress(RGB_c);
+        }
+
+        float3 RGB_a = post_adaptation_non_linear_response_compression_forward(RGB_c, F_L);
+
+        if (compressMode)
+        {
+          RGB_a = uncompress(RGB_a);
+        }
+
+
         // # Step 3
         // # Applying forward post-adaptation non-linear response compression.
-        float3 RGB_a = post_adaptation_non_linear_response_compression_forward(RGB_c, F_L);
         // float3 RGB_a = RGB_c;
         // float3 RGB_a_l = d_post_adaptation_non_linear_response_compression_forward(L_B, F_L) * ( RGB_c - L_B) + post_adaptation_non_linear_response_compression_forward( L_B, F_L );
         if (linear_extension)
