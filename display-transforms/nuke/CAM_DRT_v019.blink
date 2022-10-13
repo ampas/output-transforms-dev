@@ -75,6 +75,8 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
     // 1: Dim
     // 2: Average
     int viewingConditions;
+    int outputViewingConditions;
+
 
     //
     // SSTS Parameters
@@ -216,12 +218,14 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
     float2 bxy;
     float2 wxy;
     
+    // Input vars
     float3 XYZ_w;
     float L_A;
     float Y_b;
     float3 L_B;
     float3 surround;
     bool discount_illuminant;
+
 
 
   local:
@@ -970,7 +974,7 @@ float3 uncompress(float3 xyz)
     else if( camMode == 1 )
     {
         // return float3(1.0f,2.0f,3.0f);
-        return XYZ_to_Hellwig2022_JMh(apply_CAT(XYZ, refWhite, d65White, catType, cat_adaptDegree), XYZ_w, L_A, Y_b,surround,discount_illuminant);
+        return XYZ_to_Hellwig2022_JMh(apply_CAT(XYZ, refWhite, d65White, catType, cat_adaptDegree), XYZ_w, L_A, Y_b,viewingConditions,discount_illuminant);
     }
   }
 
@@ -988,7 +992,7 @@ float3 uncompress(float3 xyz)
     else if( camMode == 1 )
     {
         // return float3(1.0f,2.0f,3.0f);
-        XYZ = apply_CAT(Hellwig2022_JMh_to_XYZ(JMh, XYZ_w, L_A, Y_b, surround, discount_illuminant), d65White, refWhite, catType, cat_adaptDegree);
+        XYZ = apply_CAT(Hellwig2022_JMh_to_XYZ(JMh, XYZ_w, L_A, Y_b, viewingConditions, discount_illuminant), d65White, refWhite, catType, cat_adaptDegree);
     }
     return XYZ;
   }
@@ -1217,7 +1221,7 @@ float3 uncompress(float3 xyz)
   // convert ZCAM J (lightness), M (colorfulness) and h (hue) correlates to  RGB values in the output colorspace
   float3 JMh_to_output_RGB(float3 JMh)
   {
-    float3 luminanceXYZ = JMh_to_XYZ( JMh, refWhite, d65White, viewingConditions );
+    float3 luminanceXYZ = JMh_to_XYZ( JMh, refWhite, d65White, outputViewingConditions );
     float3 luminanceRGB = vector_dot(XYZ_to_RGB_output, luminanceXYZ);
     float3 outputRGB = luminanceToEncoding3( encodingOut, luminanceRGB);
 
@@ -1259,7 +1263,7 @@ float3 uncompress(float3 xyz)
     return RGB;
   }
 
-  float3 XYZ_to_Hellwig2022_JMh( float3 XYZ, float3 XYZ_w, float L_A, float Y_b, float3 surround, bool discount_illuminant)
+  float3 XYZ_to_Hellwig2022_JMh( float3 XYZ, float3 XYZ_w, float L_A, float Y_b, int viewingConditions, bool discount_illuminant)
     {
     //     """
     //     Compute the *Hellwig and Fairchild (2022)* colour appearance model
@@ -1353,6 +1357,23 @@ float3 uncompress(float3 xyz)
     // h=217.0679597..., s=0.0608550..., Q=55.8523226..., M=0.0339889..., \
     // H=275.5949861..., HC=None)
     //     """
+        float3 forwardSurround = surround;
+        // hack to turn incoming int value into surround coeffs
+        if (viewingConditions == 0)
+        {
+          // "Dark": InductionFactors_CIECAM02(0.8, 0.525, 0.8),
+          forwardSurround = (0.8, 0.525, 0.8);
+        }
+        else if (viewingConditions == 1)
+        {
+          // "Dim": InductionFactors_CIECAM02(0.9, 0.59, 0.9),
+          forwardSurround = (0.9, 0.59, 0.9);
+        }
+        else if (viewingConditions == 2)
+        {
+          // "Average": InductionFactors_CIECAM02(1, 0.69, 1),
+          forwardSurround = (1, 0.69, 1);
+        }
 
         XYZ = float3_to_domain_100(XYZ);
         XYZ_w = float3_to_domain_100(XYZ_w);
@@ -1368,7 +1389,7 @@ float3 uncompress(float3 xyz)
         float3 RGB_w = vector_dot(MATRIX_16, XYZ_w);
 
         // # Computing degree of adaptation :math:`D`.
-        float D = clip(degree_of_adaptation(surround.x, L_A), 0, 1);
+        float D = clip(degree_of_adaptation(forwardSurround.x, L_A), 0, 1);
         if(discount_illuminant)
         {
             D = 1.0f;
@@ -1584,13 +1605,31 @@ float3 uncompress(float3 xyz)
         // return XYZ;
     }
 
-    float3 Hellwig2022_JMh_to_XYZ( float3 JMh, float3 XYZ_w, float L_A, float Y_b, float3 surround, bool discount_illuminant)
+    float3 Hellwig2022_JMh_to_XYZ( float3 JMh, float3 XYZ_w, float L_A, float Y_b, int viewingConditions, bool discount_illuminant)
     {
         float J = JMh.x;
         float M = JMh.y;
         float h = JMh.z;
 
   
+        // hack to turn incoming int value into surround coeffs
+        if (viewingConditions == 0)
+        {
+          // "Dark": InductionFactors_CIECAM02(0.8, 0.525, 0.8),
+          surround = (0.8, 0.525, 0.8);
+        }
+        else if (viewingConditions == 1)
+        {
+          // "Dim": InductionFactors_CIECAM02(0.9, 0.59, 0.9),
+          surround = (0.9, 0.59, 0.9);
+        }
+        else if (viewingConditions == 2)
+        {
+          // "Average": InductionFactors_CIECAM02(1, 0.69, 1),
+          surround = (1, 0.69, 1);
+        }
+
+
         // L_A = as_float_array(L_A)
         // XYZ_w = to_domain_100(XYZ_w)
         // _X_w, Y_w, _Z_w = tsplit(XYZ_w)
@@ -1916,7 +1955,7 @@ float3 uncompress(float3 xyz)
       while( 1 )
       {
         JMtest = JMtest + unitVector * stepSize;
-        int inside = isInsideCube( vector_dot(XYZ_to_RGB, JMh_to_XYZ( float3(JMtest.x, JMtest.y, h), XYZw, XYZd65, viewingConditions ) / referenceLuminance ), boundaryRGB, smoothing);
+        int inside = isInsideCube( vector_dot(XYZ_to_RGB, JMh_to_XYZ( float3(JMtest.x, JMtest.y, h), XYZw, XYZd65, outputViewingConditions ) / referenceLuminance ), boundaryRGB, smoothing);
 
         if( searchOutwards )
         {
@@ -2447,7 +2486,7 @@ float3 uncompress(float3 xyz)
       return inputJMh;
     }
 
-    float sstsMidJ = XYZ_to_JMh( refWhite * sstsLuminance.y, refWhite, d65White, viewingConditions ).x;
+    float sstsMidJ = XYZ_to_JMh( refWhite * sstsLuminance.y, refWhite, d65White, outputViewingConditions ).x;
     float2 JMinput = float2(inputJMh.x, inputJMh.y);
     float2 JMcusp = cuspFromTable( inputJMh.z);
 
@@ -2559,6 +2598,7 @@ float3 uncompress(float3 xyz)
 
       cat_adaptDegree = viewingConditionsCoeff * (1.0f - (1.0f / 3.6f) * exp((-zcam_L_A - 42.0f) / 92.0f));
     }
+
 
     zcam_cb  = 1.15f;
     zcam_cg  = 0.66f;
