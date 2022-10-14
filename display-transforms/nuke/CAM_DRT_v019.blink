@@ -226,6 +226,10 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
     float3 surround;
     bool discount_illuminant;
 
+    // Output vars
+    float L_A_out;
+    float Y_b_out;
+
 
 
   local:
@@ -963,7 +967,7 @@ float3 uncompress(float3 xyz)
 
   // convert XYZ tristimulus values to the ZCAM J (lightness), M (colorfulness) and h (hue) correlates
   // needs XYZ tristimulus values for the reference white and a D65 white as well as the viewing conditions as parameters
-  float3 XYZ_to_JMh( float3 XYZ, float3 refWhite, float3 d65White, int viewingConditions )
+  float3 XYZ_to_JMh( float3 XYZ, float3 refWhite, float3 d65White, int viewingConditions , float L_A, float Y_b)
   {
 
     if ( camMode == 0 )
@@ -981,7 +985,7 @@ float3 uncompress(float3 xyz)
 
   // convert the ZCAM J (lightness), M (colorfulness) and h (hue) correlates to XYZ tristimulus values
   // needs XYZ tristimulus values for the reference white and a D65 white as well as the viewing conditions as parameters
-  float3 JMh_to_XYZ( float3 JMh, float3 refWhite, float3 d65White, int viewingConditions )
+  float3 JMh_to_XYZ( float3 JMh, float3 refWhite, float3 d65White, int viewingConditions , float L_A, float Y_b)
   {
     float3 XYZ;
     if ( camMode == 0 )
@@ -1204,7 +1208,7 @@ float3 uncompress(float3 xyz)
   {
     float3 luminanceRGB = encodingToLuminance3(encodingOut, RGB);
     float3 XYZ = vector_dot(RGB_to_XYZ_output, luminanceRGB);
-    float3 JMh = XYZ_to_JMh(XYZ, refWhite, d65White, viewingConditions);
+    float3 JMh = XYZ_to_JMh(XYZ, refWhite, d65White, viewingConditions, L_A_out, Y_b_out);
     return JMh;
   }
 
@@ -1213,7 +1217,7 @@ float3 uncompress(float3 xyz)
     {
     //   float3 luminanceRGB = encodingToLuminance3(encodingOut, RGB);
       float3 XYZ = vector_dot(RGB_to_XYZ_output, luminanceRGB);
-      float3 JMh = XYZ_to_JMh(XYZ, refWhite, d65White, viewingConditions);
+      float3 JMh = XYZ_to_JMh(XYZ, refWhite, d65White, viewingConditions, L_A, Y_b);
       return JMh;
     }
 
@@ -1221,7 +1225,7 @@ float3 uncompress(float3 xyz)
   // convert ZCAM J (lightness), M (colorfulness) and h (hue) correlates to  RGB values in the output colorspace
   float3 JMh_to_output_RGB(float3 JMh)
   {
-    float3 luminanceXYZ = JMh_to_XYZ( JMh, refWhite, d65White, outputViewingConditions );
+    float3 luminanceXYZ = JMh_to_XYZ( JMh, refWhite, d65White, outputViewingConditions , L_A_out, Y_b_out);
     float3 luminanceRGB = vector_dot(XYZ_to_RGB_output, luminanceXYZ);
     float3 outputRGB = luminanceToEncoding3( encodingOut, luminanceRGB);
 
@@ -1236,7 +1240,7 @@ float3 uncompress(float3 xyz)
     // convert ZCAM J (lightness), M (colorfulness) and h (hue) correlates to  RGB values in the output colorspace
     float3 JMh_to_luminance_RGB(float3 JMh)
     {
-        float3 luminanceXYZ = JMh_to_XYZ( JMh, refWhite, d65White, viewingConditions );
+        float3 luminanceXYZ = JMh_to_XYZ( JMh, refWhite, d65White, viewingConditions , L_A, Y_b);
         float3 luminanceRGB = vector_dot(XYZ_to_RGB_output, luminanceXYZ);
         // float3 outputRGB = luminanceToEncoding3( encodingOut, luminanceRGB);
 
@@ -1249,7 +1253,7 @@ float3 uncompress(float3 xyz)
   {
     float3 luminanceRGB = RGB * boundaryRGB *referenceLuminance;
     float3 XYZ = vector_dot(RGB_to_XYZ_limit, luminanceRGB);
-    float3 JMh = XYZ_to_JMh(XYZ, refWhite, d65White, viewingConditions);
+    float3 JMh = XYZ_to_JMh(XYZ, refWhite, d65White, viewingConditions, L_A, Y_b);
     return JMh;
   }
 
@@ -1257,7 +1261,7 @@ float3 uncompress(float3 xyz)
   // convert ZCAM J (lightness), M (colorfulness) and h (hue) correlates to linear RGB values with the limiting primaries
   float3 JMh_to_limit_RGB(float3 JMh)
   {
-    float3 luminanceXYZ = JMh_to_XYZ( JMh, refWhite, d65White, viewingConditions );
+    float3 luminanceXYZ = JMh_to_XYZ( JMh, refWhite, d65White, viewingConditions, L_A, Y_b );
     float3 luminanceRGB = vector_dot(XYZ_to_RGB_output, luminanceXYZ);
     float3 RGB = luminanceRGB / boundaryRGB / referenceLuminance;
     return RGB;
@@ -1561,18 +1565,18 @@ float3 uncompress(float3 xyz)
         // with sdiv_mode():
         //     J = 100 * spow(sdiv(A, A_w), surround.c * z)
 
-        float J = 100.0f * spow(sdiv(A, A_w), surround.y * z);
+        float J = 100.0f * spow(sdiv(A, A_w), forwardSurround.y * z);
 
         // # Step 8
         // # Computing the correlate of *brightness* :math:`Q`.
         // with sdiv_mode():
         //     Q = (2 / as_float(surround.c)) * (J / 100) * A_w
-        float Q = (2.0f / float(surround.y)) * (J / 100.0f) * A_w;
+        float Q = (2.0f / float(forwardSurround.y)) * (J / 100.0f) * A_w;
 
         // # Step 9
         // # Computing the correlate of *colourfulness* :math:`M`.
         // M = 43 * surround.N_c * e_t * np.sqrt(a**2 + b**2)
-        float M = 43.0f * surround.z * e_t * sqrt(a * a + b * b);
+        float M = 43.0f * forwardSurround.z * e_t * sqrt(a * a + b * b);
 
         // # Computing the correlate of *chroma* :math:`C`.
         // with sdiv_mode():
@@ -1587,7 +1591,7 @@ float3 uncompress(float3 xyz)
 
         // # *Helmholtz–Kohlrausch* Effect Extension.
         float J_HK = J + hue_angle_dependency_Hellwig2022(hr) * spow(C, 0.587f);
-        float Q_HK = (2.0f / surround.y) * (J_HK / 100.0f) * A_w ;
+        float Q_HK = (2.0f / forwardSurround.y) * (J_HK / 100.0f) * A_w ;
     
         // return XYZ_w;
         // return RGB_w;
@@ -1955,7 +1959,7 @@ float3 uncompress(float3 xyz)
       while( 1 )
       {
         JMtest = JMtest + unitVector * stepSize;
-        int inside = isInsideCube( vector_dot(XYZ_to_RGB, JMh_to_XYZ( float3(JMtest.x, JMtest.y, h), XYZw, XYZd65, outputViewingConditions ) / referenceLuminance ), boundaryRGB, smoothing);
+        int inside = isInsideCube( vector_dot(XYZ_to_RGB, JMh_to_XYZ( float3(JMtest.x, JMtest.y, h), XYZw, XYZd65, outputViewingConditions , L_A, Y_b) / referenceLuminance ), boundaryRGB, smoothing);
 
         if( searchOutwards )
         {
@@ -2301,7 +2305,7 @@ float3 uncompress(float3 xyz)
     // float3 refWhiteIzazbz = XYZ_to_Izazbz(refWhite*referenceLuminance/refWhite.y);
     // float3 colorJMh = Izazbz_to_JMh(Izazbz, refWhiteIzazbz.x, 0);
 
-    float3 JMh = XYZ_to_JMh(luminanceXYZ, inWhite, d65White, viewingConditions);
+    float3 JMh = XYZ_to_JMh(luminanceXYZ, inWhite, d65White, viewingConditions, L_A, Y_b);
 
     return JMh;
 
@@ -2313,7 +2317,7 @@ float3 uncompress(float3 xyz)
   {
 
 
-    float3 luminanceXYZ = JMh_to_XYZ( JMh, inWhite, d65White, viewingConditions );
+    float3 luminanceXYZ = JMh_to_XYZ( JMh, inWhite, d65White, viewingConditions , L_A, Y_b);
     // // CAT to go from D60 to D65
     // if (D60toD65CATtoggle)
     // {
@@ -2486,7 +2490,7 @@ float3 uncompress(float3 xyz)
       return inputJMh;
     }
 
-    float sstsMidJ = XYZ_to_JMh( refWhite * sstsLuminance.y, refWhite, d65White, outputViewingConditions ).x;
+    float sstsMidJ = XYZ_to_JMh( refWhite * sstsLuminance.y, refWhite, d65White, outputViewingConditions, L_A_out, Y_b_out ).x;
     float2 JMinput = float2(inputJMh.x, inputJMh.y);
     float2 JMcusp = cuspFromTable( inputJMh.z);
 
@@ -2990,29 +2994,41 @@ float3 uncompress(float3 xyz)
     }
     else
     {
-      // normal path
-      float3 JMh = input_RGB_to_JMh(srcRGB);
-      float3 tonemappedJMh = forwardTonescale(JMh);
-      float3 compressedJMh = compressGamutForward(tonemappedJMh);
-      dstRGB = JMh_to_output_RGB(compressedJMh);
-
+      
       // testing 
       // dstRGB = JMh_to_output_RGB(tonemappedJMh);
       if (diagnosticMode == 0)
       {        
+        // normal path
+        float3 JMh = input_RGB_to_JMh(srcRGB);
+        float3 tonemappedJMh = forwardTonescale(JMh);
+        float3 compressedJMh = compressGamutForward(tonemappedJMh);
+        dstRGB = JMh_to_output_RGB(compressedJMh);
         diagnostic =  dstRGB;
       }
       else if ( diagnosticMode == 1)
       {
+        float3 JMh = input_RGB_to_JMh(srcRGB);
         diagnostic =  JMh;
       }
       else if ( diagnosticMode == 2)
       {
+        float3 JMh = input_RGB_to_JMh(srcRGB);
+        float3 tonemappedJMh = forwardTonescale(JMh);
         diagnostic =  tonemappedJMh;
       }
       else if ( diagnosticMode == 3)
       {
+        float3 JMh = input_RGB_to_JMh(srcRGB);
+        float3 tonemappedJMh = forwardTonescale(JMh);
+        float3 compressedJMh = compressGamutForward(tonemappedJMh);
         diagnostic =  compressedJMh;
+      }
+      else if ( diagnosticMode == 4)
+      {
+        float3 JMh = input_RGB_to_JMh(srcRGB);
+        dstRGB = JMh_to_output_RGB(JMh);
+        diagnostic =  dstRGB;
       }
     }
 
