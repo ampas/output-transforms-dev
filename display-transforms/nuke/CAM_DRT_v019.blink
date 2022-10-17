@@ -1956,7 +1956,7 @@ float3 uncompress(float3 xyz)
     for( int i = 0; i < precision; ++i )
     {
 
-      while( 1 )
+      for( int i = 0; i < 30; ++i )
       {
         JMtest = JMtest + unitVector * stepSize;
         int inside = isInsideCube( vector_dot(XYZ_to_RGB, JMh_to_XYZ( float3(JMtest.x, JMtest.y, h), XYZw, XYZd65, outputViewingConditions , L_A, Y_b) / referenceLuminance ), boundaryRGB, smoothing);
