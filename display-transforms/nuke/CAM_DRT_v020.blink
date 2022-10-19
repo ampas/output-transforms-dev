@@ -124,6 +124,7 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
     // Gamut Compression Fuction Parameters
     // Threshold / Limit / Power
     float3 compressionFuncParams;
+    float compressionMix;
 
     // How much the edges of the target RGB cube are smoothed when finding the gamut boundary 
     // in order to reduce visible contours at the gamut cusps
@@ -1217,7 +1218,7 @@ float3 uncompress(float3 xyz)
     {
     //   float3 luminanceRGB = encodingToLuminance3(encodingOut, RGB);
       float3 XYZ = vector_dot(RGB_to_XYZ_output, luminanceRGB);
-      float3 JMh = XYZ_to_JMh(XYZ, refWhite, d65White, viewingConditions, L_A, Y_b);
+      float3 JMh = XYZ_to_JMh(XYZ, refWhite, d65White, outputViewingConditions, L_A, Y_b);
       return JMh;
     }
 
@@ -1240,7 +1241,7 @@ float3 uncompress(float3 xyz)
     // convert ZCAM J (lightness), M (colorfulness) and h (hue) correlates to  RGB values in the output colorspace
     float3 JMh_to_luminance_RGB(float3 JMh)
     {
-        float3 luminanceXYZ = JMh_to_XYZ( JMh, refWhite, d65White, viewingConditions , L_A, Y_b);
+        float3 luminanceXYZ = JMh_to_XYZ( JMh, refWhite, d65White, outputViewingConditions , L_A, Y_b);
         float3 luminanceRGB = vector_dot(XYZ_to_RGB_output, luminanceXYZ);
         // float3 outputRGB = luminanceToEncoding3( encodingOut, luminanceRGB);
 
@@ -2498,14 +2499,16 @@ float3 uncompress(float3 xyz)
 
     float focusDistanceGain = 1.0f;
 
-    if( distanceGainCalcJ > focusJ )
-    {
-      focusDistanceGain = (limitJmax - focusJ) / max(0.0001f, (limitJmax - min(limitJmax, distanceGainCalcJ)));
-    }
-    else
-    {
+    // This section was causing a weird to collapse of the M value with Hellwig. Commented out until I understand more
+
+    // if( distanceGainCalcJ > focusJ )
+    // {
+    //   focusDistanceGain = (limitJmax - focusJ) / max(0.0001f, (limitJmax - min(limitJmax, distanceGainCalcJ)));
+    // }
+    // else
+    // {
       focusDistanceGain = (focusJ) / max(0.0001f, distanceGainCalcJ); 
-    }
+    // }
 
     float2 JMfocus = float2( focusJ, -JMcusp.y*focusDistanceClamped*focusDistanceGain );
     float2 vecToFocus = (JMfocus - JMinput);
@@ -2539,6 +2542,8 @@ float3 uncompress(float3 xyz)
     {
       JMcompressed = JMinput;
     }
+    JMcompressed.x = lerp(JMcompressed.x,inputJMh.x,compressionMix);
+    JMcompressed.y = lerp(JMcompressed.y,inputJMh.y,compressionMix);
     return float3(JMcompressed.x, JMcompressed.y, inputJMh.z);
   }
 
