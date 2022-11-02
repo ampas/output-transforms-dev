@@ -1,0 +1,186 @@
+
+kernel danielleEvoCompressionCurveKernel : ImageComputationKernel<ePixelWise>
+{
+  Image<eRead, eAccessPoint, eEdgeClamped> src; // the input image
+  Image<eWrite> dst; // the output image
+
+  param:
+   
+
+    // Tonescale select
+    bool inverse;
+    // danielleEvo tonescale parameters
+    float n;
+    // float Lp; //   - peak luminance in nits
+    // float N_r;//   - normalized white in nits (what 1.0 should be)
+    // float r_hit;  //   - scene-referred value "hitting the roof"
+    // float g;  //   - surround/contrast 
+    // float w;  //   - exposure (to make HDR brighter than SDR
+    // float t1; //   - shadow toe, glare compensation
+
+  local:
+    // constants
+
+
+
+  void define()
+  {
+
+  }
+
+
+  // get the y value of f(x) where the fuction is defined as a line between two points
+  // the two points as passed as an array [a.x, a.y, b.x, b.y]
+  float lerp1D( float4 table, float x)
+  {
+    float m = (table.w-table.y) / (table.z-table.x);
+    float c = table.y - (m*table.x);
+    float y = x*m+c;
+    return y;
+  }
+
+
+  // "safe" power function to avoid NANs or INFs when taking a fractional power of a negative base
+  // this one initially retured -pow(abs(b), e) for negative b
+  // but this ended up producing undesirable results in some cases
+  // so now it just returns 0.0 instead
+  float spow( float base, float exponent )
+  {
+    if(base < 0.0f && exponent != floor(exponent) )
+    {
+      return 0.0f;
+    }
+    else
+    {
+     return pow(base, exponent); 
+    }
+  }
+
+
+  // clamp the components of a 3D vector between a min & max value
+  float3 clamp3(float3 v, float min, float max)
+  {
+    v.x = clamp(v.x, min, max);
+    v.y = clamp(v.y, min, max);
+    v.z = clamp(v.z, min, max);
+    return v;
+  }
+
+
+  float flare(float x,float fl,bool invert)
+  { 
+    // flare compensation
+    x = clamp(x, 0.0, 65504.0);
+    if(invert)
+    {
+        return (x+sqrt(x*(4*fl+x)))/2;
+    }
+    else
+    {
+        return (x*x/(x+fl));
+    }
+  }
+
+  float ts_mm(float x, float s2, float m2, float g, bool invert)
+  {
+    // Michaelis-Menten tonescale function with post-tonemap contrast
+    x = clamp(x, 0.0, 65504.0);
+    if (invert)
+    {
+        // return s2/((m2/x)^(1./g)-1);
+        return s2/(spow(m2/x,1.0/g)-1.0);
+    }
+    else
+    {
+        return spow(m2*(x/(x+s2)),g);
+    }
+
+  }
+
+
+  float danieleEvoCompressionCurve(float x,float n,bool invert)
+  {
+
+    // main vars
+    float n_r = 100; 
+    float r_hit = 128 + 768 * ( log(n/n_r)/log(10000/100) ); 
+    float g = 1.15;
+    float c = 0.18;
+    float c_d = 10.1;
+    float w_g = 0.14;
+    float t1 = 0.041;
+    // bool invert = false;
+    // bool deriv = false;
+
+
+    // Pre-calculations
+    float m0 = (n / n_r);
+    float m1 = 0.5 * (m0 + sqrt(m0 *(m0+4 *t1)));
+    float u = spow(( (r_hit /m1)/((r_hit /m1)+1) ) , g);
+    float u2 = spow(( (r_hit /m1)/((r_hit /m1)+w_g) ) ,g);
+    float m = m1  / u;
+    float m2 = m1  / u2;
+    float w_i = log(n /100)/log(2);
+    float c_t = c_d /n_r  * (1 + w_i  * w_g);
+    float g_ip = 0.5  * (c_t + sqrt(c_t  *(c_t+4 *t1)));
+    float g_ipp2 = -(m1 * spow(g_ip/m,1.0f/g)) / (spow(g_ip/m,1.0f/g)-1.0f);
+    float w2 = c /g_ipp2;
+    float s2 = w2  * m1;
+
+    if (invert)
+    {
+        // x = flare(x/100, t1, true);
+        x = ts_mm(x, s2, m2, g, true);
+    }
+    else
+    {
+        x = ts_mm(x, s2, m2, g, false);
+        // x = flare(x, t1,false)*100;
+    }
+
+    return x;
+
+  }
+
+
+  float forwardDanieleCompressionCurve(float x)
+  {
+      return danieleEvoCompressionCurve( x,n,false);
+  }
+
+  float inverseDanieleCompressionCurve(float x)
+  {
+    return danieleEvoCompressionCurve( x,n,true);
+  }
+
+
+  void init()
+  {
+    
+  }
+
+
+  void process()
+  {
+    SampleType(src) source = src();
+    float3 srcRGB(source.x, source.y, source.z);
+    float3 mappedVals;
+    if(!inverse)
+    {
+        mappedVals.x = forwardDanieleCompressionCurve(source.x);
+        mappedVals.y = forwardDanieleCompressionCurve(source.y);
+        mappedVals.z = forwardDanieleCompressionCurve(source.z);
+    }
+    else
+    {
+        mappedVals.x = inverseDanieleCompressionCurve(source.x);
+        mappedVals.y = inverseDanieleCompressionCurve(source.y);
+        mappedVals.z = inverseDanieleCompressionCurve(source.z);
+    }
+
+
+    float3 dstRGB;
+
+    dst() = float4(mappedVals.x, mappedVals.y, mappedVals.z, source.w); 
+  }
+};

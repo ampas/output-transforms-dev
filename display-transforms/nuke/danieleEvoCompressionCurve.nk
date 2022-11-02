@@ -1,0 +1,144 @@
+#! /Applications/Nuke13.0v3/Nuke13.0v3.app/Contents/MacOS/libnuke-13.0.3.dylib -nx
+version 13.0 v3
+define_window_layout_xml {<?xml version="1.0" encoding="UTF-8"?>
+<layout version="1.0">
+    <window x="0" y="25" w="3008" h="1562" maximized="1" screen="0">
+        <splitter orientation="1">
+            <split size="40"/>
+            <dock id="" hideTitles="1" activePageId="Toolbar.1">
+                <page id="Toolbar.1"/>
+            </dock>
+            <split size="2345" stretch="1"/>
+            <splitter orientation="2">
+                <split size="905"/>
+                <dock id="" activePageId="Viewer.1" focus="true">
+                    <page id="Viewer.1"/>
+                </dock>
+                <split size="637"/>
+                <dock id="" activePageId="DAG.1">
+                    <page id="DAG.1"/>
+                    <page id="Curve Editor.1"/>
+                    <page id="DopeSheet.1"/>
+                </dock>
+            </splitter>
+            <split size="615"/>
+            <dock id="" activePageId="Properties.1">
+                <page id="Properties.1"/>
+                <page id="uk.co.thefoundry.backgroundrenderview.1"/>
+            </dock>
+        </splitter>
+    </window>
+</layout>
+}
+Root {
+ inputs 0
+ name /Users/afry/GitHub/output-transforms-dev/display-transforms/nuke/danieleEvoCompressionCurve.nk
+ format "2048 1556 0 0 2048 1556 1 2K_Super_35(full-ap)"
+ proxy_type scale
+ proxy_format "1024 778 0 0 1024 778 1 1K_Super_35(full-ap)"
+ colorManagement Nuke
+ OCIO_config custom
+ customOCIOConfigPath /Users/afry/Documents/GitHub/OpenColorIO-Configs/aces_1.2/config.ocio
+ workingSpaceLUT linear
+ monitorLut sRGB
+ monitorOutLUT rec709
+ int8Lut sRGB
+ int16Lut sRGB
+ logLut Cineon
+ floatLut linear
+}
+Ramp {
+ inputs 0
+ p0 {0 0}
+ p1 {2048 0}
+ name Ramp1
+ xpos -268
+ ypos -176
+}
+BlinkScript {
+ kernelSourceFile /Users/afry/GitHub/output-transforms-dev/display-transforms/nuke/danieleEvoCompressionCurve.blink
+ recompileCount 52
+ ProgramGroup 1
+ KernelDescription "2 \"danielleEvoCompressionCurveKernel\" iterate pixelWise 5305fd9f0573fdf82fb6193ac1e1fa223292ddc350a1b2d8a3ad87207b41d0d3 2 \"src\" Read Point \"dst\" Write Point 2 \"inverse\" Bool 1 AA== \"n\" Float 1 AAAAAA== 2 \"inverse\" 1 1 \"n\" 1 1 0"
+ kernelSource "\nkernel danielleEvoCompressionCurveKernel : ImageComputationKernel<ePixelWise>\n\{\n  Image<eRead, eAccessPoint, eEdgeClamped> src; // the input image\n  Image<eWrite> dst; // the output image\n\n  param:\n   \n\n    // Tonescale select\n    bool inverse;\n    // danielleEvo tonescale parameters\n    float n;\n    // float Lp; //   - peak luminance in nits\n    // float N_r;//   - normalized white in nits (what 1.0 should be)\n    // float r_hit;  //   - scene-referred value \"hitting the roof\"\n    // float g;  //   - surround/contrast \n    // float w;  //   - exposure (to make HDR brighter than SDR\n    // float t1; //   - shadow toe, glare compensation\n\n  local:\n    // constants\n\n\n\n  void define()\n  \{\n\n  \}\n\n\n  // get the y value of f(x) where the fuction is defined as a line between two points\n  // the two points as passed as an array \[a.x, a.y, b.x, b.y]\n  float lerp1D( float4 table, float x)\n  \{\n    float m = (table.w-table.y) / (table.z-table.x);\n    float c = table.y - (m*table.x);\n    float y = x*m+c;\n    return y;\n  \}\n\n\n  // \"safe\" power function to avoid NANs or INFs when taking a fractional power of a negative base\n  // this one initially retured -pow(abs(b), e) for negative b\n  // but this ended up producing undesirable results in some cases\n  // so now it just returns 0.0 instead\n  float spow( float base, float exponent )\n  \{\n    if(base < 0.0f && exponent != floor(exponent) )\n    \{\n      return 0.0f;\n    \}\n    else\n    \{\n     return pow(base, exponent); \n    \}\n  \}\n\n\n  // clamp the components of a 3D vector between a min & max value\n  float3 clamp3(float3 v, float min, float max)\n  \{\n    v.x = clamp(v.x, min, max);\n    v.y = clamp(v.y, min, max);\n    v.z = clamp(v.z, min, max);\n    return v;\n  \}\n\n\n  float flare(float x,float fl,bool invert)\n  \{ \n    // flare compensation\n    x = clamp(x, 0.0, 65504.0);\n    if(invert)\n    \{\n        return (x+sqrt(x*(4*fl+x)))/2;\n    \}\n    else\n    \{\n        return (x*x/(x+fl));\n    \}\n  \}\n\n  float ts_mm(float x, float s2, float m2, float g, bool invert)\n  \{\n    // Michaelis-Menten tonescale function with post-tonemap contrast\n    x = clamp(x, 0.0, 65504.0);\n    if (invert)\n    \{\n        // return s2/((m2/x)^(1./g)-1);\n        return s2/(spow(m2/x,1.0/g)-1.0);\n    \}\n    else\n    \{\n        return spow(m2*(x/(x+s2)),g);\n    \}\n\n  \}\n\n\n  float danieleEvoCompressionCurve(float x,float n,bool invert)\n  \{\n\n    // main vars\n    float n_r = 100; \n    float r_hit = 128 + 768 * ( log(n/n_r)/log(10000/100) ); \n    float g = 1.15;\n    float c = 0.18;\n    float c_d = 10.1;\n    float w_g = 0.14;\n    float t1 = 0.041;\n    // bool invert = false;\n    // bool deriv = false;\n\n\n    // Pre-calculations\n    float m0 = (n / n_r);\n    float m1 = 0.5 * (m0 + sqrt(m0 *(m0+4 *t1)));\n    float u = spow(( (r_hit /m1)/((r_hit /m1)+1) ) , g);\n    float u2 = spow(( (r_hit /m1)/((r_hit /m1)+w_g) ) ,g);\n    float m = m1  / u;\n    float m2 = m1  / u2;\n    float w_i = log(n /100)/log(2);\n    float c_t = c_d /n_r  * (1 + w_i  * w_g);\n    float g_ip = 0.5  * (c_t + sqrt(c_t  *(c_t+4 *t1)));\n    float g_ipp2 = -(m1 * spow(g_ip/m,1.0f/g)) / (spow(g_ip/m,1.0f/g)-1.0f);\n    float w2 = c /g_ipp2;\n    float s2 = w2  * m1;\n\n    if (invert)\n    \{\n        // x = flare(x/100, t1, true);\n        x = ts_mm(x, s2, m2, g, true);\n    \}\n    else\n    \{\n        x = ts_mm(x, s2, m2, g, false);\n        // x = flare(x, t1,false)*100;\n    \}\n\n    return x;\n\n  \}\n\n\n  float forwardDanieleCompressionCurve(float x)\n  \{\n      return danieleEvoCompressionCurve( x,n,false);\n  \}\n\n  float inverseDanieleCompressionCurve(float x)\n  \{\n    return danieleEvoCompressionCurve( x,n,true);\n  \}\n\n\n  void init()\n  \{\n    \n  \}\n\n\n  void process()\n  \{\n    SampleType(src) source = src();\n    float3 srcRGB(source.x, source.y, source.z);\n    float3 mappedVals;\n    if(!inverse)\n    \{\n        mappedVals.x = forwardDanieleCompressionCurve(source.x);\n        mappedVals.y = forwardDanieleCompressionCurve(source.y);\n        mappedVals.z = forwardDanieleCompressionCurve(source.z);\n    \}\n    else\n    \{\n        mappedVals.x = inverseDanieleCompressionCurve(source.x);\n        mappedVals.y = inverseDanieleCompressionCurve(source.y);\n        mappedVals.z = inverseDanieleCompressionCurve(source.z);\n    \}\n\n\n    float3 dstRGB;\n\n    dst() = float4(mappedVals.x, mappedVals.y, mappedVals.z, source.w); \n  \}\n\};\n"
+ rebuild ""
+ danielleEvoCompressionCurveKernel_inverse true
+ rebuild_finalise ""
+ name BlinkScript1
+ xpos -268
+ ypos -107
+}
+set N1b536000 [stack 0]
+Group {
+ name PlotScanline
+ xpos -268
+ ypos -28
+ addUserKnob {20 Params}
+ addUserKnob {41 p l pos T PlotScanline_.p}
+ addUserKnob {41 mx l max T PlotScanline_.mx}
+ addUserKnob {41 mn l min T PlotScanline_.mn}
+ addUserKnob {7 os l oversample t "antialias by scaling up then scaling down (slower)" R 1 2}
+ os 1
+}
+ Input {
+  inputs 0
+  name Input
+  xpos 180
+  ypos 614
+ }
+ Reformat {
+  type scale
+  scale {{os}}
+  filter notch
+  name ReformatUp
+  xpos 180
+  ypos 663
+ }
+ Expression {
+  temp_name0 h
+  temp_expr0 height/(mx-mn)
+  expr0 y==floor((r(x,p)-mn)*h)?1:y==floor(h*-mn)&&!(x%12)?4:y==floor(h-h*mn)&&!(x%12)?4:0
+  expr1 y==floor((g(x,p)-mn)*h)?1:0
+  expr2 y==floor((b(x,p)-mn)*h)?1:0
+  name PlotScanline_
+  xpos 180
+  ypos 687
+  addUserKnob {20 Params}
+  addUserKnob {7 p l pos R 0 2048}
+  p 1
+  addUserKnob {7 mx l max R 1 4}
+  mx 1.05
+  addUserKnob {7 mn l min R -0.2 0}
+  mn -0.05
+ }
+ Reformat {
+  type scale
+  scale {{1/parent.ReformatUp.scale}}
+  filter notch
+  name ReformatDown
+  xpos 180
+  ypos 711
+ }
+ Blur {
+  channels rgba
+  size {{1.6-(os-1)*1.6}}
+  name Blur1
+  xpos 180
+  ypos 735
+ }
+ Output {
+  name Output
+  xpos 180
+  ypos 782
+ }
+end_group
+push $N1b536000
+Viewer {
+ frame_range 1-100
+ colour_sample_bbox {0.1328125 -0.0234375 0.1337890625 -0.0224609375}
+ gl_buffer_depth half-float
+ name Viewer1
+ selected true
+ xpos -258
+ ypos 41
+}
