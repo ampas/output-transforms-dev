@@ -117,7 +117,7 @@ kernel danielleEvoCompressionCurveKernel : ImageComputationKernel<ePixelWise>
     float m0 = (n / n_r);
     float m1 = 0.5 * (m0 + sqrt(m0 *(m0+4 *t1)));
     float u = spow(( (r_hit /m1)/((r_hit /m1)+1) ) , g);
-    float u2 = spow(( (r_hit /m1)/((r_hit /m1)+w_g) ) ,g);
+    float u2 = spow(( (r_hit /m1)/((r_hit /m1)+w_2) ) ,g);
     float m = m1  / u;
     float m2 = m1  / u2;
     float w_i = log(n /100)/log(2);

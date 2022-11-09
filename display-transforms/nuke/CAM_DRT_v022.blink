@@ -240,10 +240,11 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
     
     // Input vars
     float3 XYZ_w;
+    float XYZ_w_scaler;
     float L_A;
     float Y_b;
     float3 L_B;
-    float3 surround;
+    float3 userSurround;
     bool discount_illuminant;
 
     // Output vars
@@ -727,7 +728,32 @@ float3 uncompress(float3 xyz)
     }
   }
 
-
+  float3 viewingConditionsToSurround(int viewingConditions)
+  {
+      float3 newSurround;
+      // hack to turn incoming int value into surround coeffs
+      if (viewingConditions == 0)
+      {
+          // "Dark": InductionFactors_CIECAM02(0.8, 0.525, 0.8),
+          newSurround = float3(0.8, 0.525, 0.8);
+      }
+      else if (viewingConditions == 1)
+      {
+          // "Dim": InductionFactors_CIECAM02(0.9, 0.59, 0.9),
+          newSurround = float3(0.9, 0.59, 0.9);
+      }
+      else if (viewingConditions == 2)
+      {
+          // "Average": InductionFactors_CIECAM02(1, 0.69, 1),
+          newSurround = float3(1.0, 0.69, 1.0);
+      }
+      else if (viewingConditions == 3)
+      {
+          // Pull from external input
+          newSurround = userSurround;
+      }
+      return newSurround;
+  }
 
   // "PowerP" compression function (also used in the ACES Reference Gamut Compression transform)
   // values of v above  'treshold' are compressed by a 'power' function
@@ -977,7 +1003,8 @@ float3 uncompress(float3 xyz)
     else if( camMode == 1 )
     {
         // return float3(1.0f,2.0f,3.0f);
-        return XYZ_to_Hellwig2022_JMh(apply_CAT(XYZ, refWhite, d65White, catType, cat_adaptDegree), XYZ_w, L_A, Y_b,viewingConditions,discount_illuminant);
+        return XYZ_to_Hellwig2022_JMh(apply_CAT(XYZ, refWhite, d65White, catType, cat_adaptDegree), XYZ_w, L_A, Y_b,viewingConditionsToSurround(viewingConditions),discount_illuminant);
+        // return XYZ_to_Hellwig2022_JMh(XYZ, XYZ_w, L_A, Y_b,viewingConditionsToSurround(viewingConditions),discount_illuminant);
     }
   }
 
@@ -995,7 +1022,8 @@ float3 uncompress(float3 xyz)
     else if( camMode == 1 )
     {
         // return float3(1.0f,2.0f,3.0f);
-        XYZ = apply_CAT(Hellwig2022_JMh_to_XYZ(JMh, XYZ_w, L_A, Y_b, viewingConditions, discount_illuminant), d65White, refWhite, catType, cat_adaptDegree);
+        XYZ = apply_CAT(Hellwig2022_JMh_to_XYZ(JMh, XYZ_w, L_A, Y_b, viewingConditionsToSurround(viewingConditions), discount_illuminant), d65White, refWhite, catType, cat_adaptDegree);
+        // XYZ = Hellwig2022_JMh_to_XYZ(JMh, XYZ_w, L_A, Y_b, viewingConditionsToSurround(viewingConditions), discount_illuminant);
     }
     return XYZ;
   }
@@ -1266,7 +1294,7 @@ float3 uncompress(float3 xyz)
     return RGB;
   }
 
-  float3 XYZ_to_Hellwig2022_JMh( float3 XYZ, float3 XYZ_w, float L_A, float Y_b, int viewingConditions, bool discount_illuminant)
+  float3 XYZ_to_Hellwig2022_JMh( float3 XYZ, float3 XYZ_w, float L_A, float Y_b, float3 surround, bool discount_illuminant)
     {
     //     """
     //     Compute the *Hellwig and Fairchild (2022)* colour appearance model
@@ -1360,26 +1388,10 @@ float3 uncompress(float3 xyz)
     // h=217.0679597..., s=0.0608550..., Q=55.8523226..., M=0.0339889..., \
     // H=275.5949861..., HC=None)
     //     """
-        float3 forwardSurround = surround;
-        // hack to turn incoming int value into surround coeffs
-        if (viewingConditions == 0)
-        {
-          // "Dark": InductionFactors_CIECAM02(0.8, 0.525, 0.8),
-          forwardSurround = (0.8, 0.525, 0.8);
-        }
-        else if (viewingConditions == 1)
-        {
-          // "Dim": InductionFactors_CIECAM02(0.9, 0.59, 0.9),
-          forwardSurround = (0.9, 0.59, 0.9);
-        }
-        else if (viewingConditions == 2)
-        {
-          // "Average": InductionFactors_CIECAM02(1, 0.69, 1),
-          forwardSurround = (1, 0.69, 1);
-        }
+
 
         XYZ = float3_to_domain_100(XYZ);
-        XYZ_w = float3_to_domain_100(XYZ_w * 100.0f);
+        XYZ_w = float3_to_domain_100(XYZ_w) * XYZ_w_scaler;
         float _X_w = XYZ_w.x ;
         float Y_w = XYZ_w.y ;
         float _Z_w = XYZ_w.z ;
@@ -1392,7 +1404,7 @@ float3 uncompress(float3 xyz)
         float3 RGB_w = vector_dot(MATRIX_16, XYZ_w);
 
         // # Computing degree of adaptation :math:`D`.
-        float D = clip(degree_of_adaptation(forwardSurround.x, L_A), 0, 1);
+        float D = clip(degree_of_adaptation(surround.x, L_A), 0, 1);
         if(discount_illuminant)
         {
             D = 1.0f;
@@ -1564,18 +1576,18 @@ float3 uncompress(float3 xyz)
         // with sdiv_mode():
         //     J = 100 * spow(sdiv(A, A_w), surround.c * z)
 
-        float J = 100.0f * spow(sdiv(A, A_w), forwardSurround.y * z);
+        float J = 100.0f * spow(sdiv(A, A_w), surround.y * z);
 
         // # Step 8
         // # Computing the correlate of *brightness* :math:`Q`.
         // with sdiv_mode():
         //     Q = (2 / as_float(surround.c)) * (J / 100) * A_w
-        float Q = (2.0f / float(forwardSurround.y)) * (J / 100.0f) * A_w;
+        float Q = (2.0f / float(surround.y)) * (J / 100.0f) * A_w;
 
         // # Step 9
         // # Computing the correlate of *colourfulness* :math:`M`.
         // M = 43 * surround.N_c * e_t * np.sqrt(a**2 + b**2)
-        float M = 43.0f * forwardSurround.z * e_t * sqrt(a * a + b * b);
+        float M = 43.0f * surround.z * e_t * sqrt(a * a + b * b);
 
         // # Computing the correlate of *chroma* :math:`C`.
         // with sdiv_mode():
@@ -1590,7 +1602,7 @@ float3 uncompress(float3 xyz)
 
         // # *Helmholtz–Kohlrausch* Effect Extension.
         float J_HK = J + hue_angle_dependency_Hellwig2022(hr) * spow(C, 0.587f);
-        float Q_HK = (2.0f / forwardSurround.y) * (J_HK / 100.0f) * A_w ;
+        float Q_HK = (2.0f / surround.y) * (J_HK / 100.0f) * A_w ;
     
         // return XYZ_w;
         // return RGB_w;
@@ -1608,29 +1620,13 @@ float3 uncompress(float3 xyz)
         // return XYZ;
     }
 
-    float3 Hellwig2022_JMh_to_XYZ( float3 JMh, float3 XYZ_w, float L_A, float Y_b, int viewingConditions, bool discount_illuminant)
+    float3 Hellwig2022_JMh_to_XYZ( float3 JMh, float3 XYZ_w, float L_A, float Y_b, float3 surround, bool discount_illuminant)
     {
         float J = JMh.x;
         float M = JMh.y;
         float h = JMh.z;
-
+        XYZ_w  = XYZ_w  * XYZ_w_scaler;
   
-        // hack to turn incoming int value into surround coeffs
-        if (viewingConditions == 0)
-        {
-          // "Dark": InductionFactors_CIECAM02(0.8, 0.525, 0.8),
-          surround = (0.8, 0.525, 0.8);
-        }
-        else if (viewingConditions == 1)
-        {
-          // "Dim": InductionFactors_CIECAM02(0.9, 0.59, 0.9),
-          surround = (0.9, 0.59, 0.9);
-        }
-        else if (viewingConditions == 2)
-        {
-          // "Average": InductionFactors_CIECAM02(1, 0.69, 1),
-          surround = (1, 0.69, 1);
-        }
 
 
         // L_A = as_float_array(L_A)
@@ -2213,7 +2209,14 @@ float3 uncompress(float3 xyz)
 
     float3 JMh = XYZ_to_JMh(luminanceXYZ, inWhite, d65White, viewingConditions, L_A, Y_b);
 
-    return JMh;
+    if (diagnosticMode == 7)
+    {
+      return luminanceXYZ;
+    }
+      else
+    {
+      return JMh;
+    }
 
   }
 
@@ -2901,6 +2904,12 @@ float3 uncompress(float3 xyz)
       {
         float3 JMh = input_RGB_to_JMh(srcRGB);
         dstRGB = JMh_to_output_RGB(JMh);
+        diagnostic =  dstRGB;
+      }
+      else if ( diagnosticMode == 7)
+      {
+        float3 JMh = input_RGB_to_JMh(srcRGB);
+        dstRGB = JMh;
         diagnostic =  dstRGB;
       }
     }
