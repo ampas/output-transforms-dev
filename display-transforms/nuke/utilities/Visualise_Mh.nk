@@ -1,0 +1,441 @@
+set cut_paste_input [stack 0]
+version 13.0 v3
+push $cut_paste_input
+Group {
+ name Visualise_Mh
+ tile_color 0xa331e0ff
+ note_font "Verdana Bold Italic"
+ note_font_color 0xb938ffff
+ selected true
+ xpos 1064
+ ypos 2285
+ addUserKnob {20 User}
+ addUserKnob {26 notes l "" +STARTLINE T "Assumes XYZ input"}
+ addUserKnob {26 "" +STARTLINE}
+ addUserKnob {3 BlinkScript22_hellwig2022_direction l direction}
+ addUserKnob {3 BlinkScript22_hellwig2022_catDataSelection l catDataSelection}
+ addUserKnob {13 BlinkScript22_hellwig2022_XYZ_w l XYZ_w}
+ BlinkScript22_hellwig2022_XYZ_w {95.05 100 108.88}
+ addUserKnob {8 BlinkScript22_hellwig2022_XYZ_w_scaler l XYZ_w_scaler}
+ BlinkScript22_hellwig2022_XYZ_w_scaler 1
+ addUserKnob {8 BlinkScript22_hellwig2022_L_A l L_A}
+ BlinkScript22_hellwig2022_L_A 100
+ addUserKnob {8 BlinkScript22_hellwig2022_Y_b l Y_b}
+ BlinkScript22_hellwig2022_Y_b 20
+ addUserKnob {13 BlinkScript22_hellwig2022_L_B l L_B}
+ addUserKnob {13 BlinkScript22_hellwig2022_userSurround l userSurround}
+ BlinkScript22_hellwig2022_userSurround {1 0.69 1}
+ addUserKnob {6 BlinkScript22_hellwig2022_discount_illuminant l discount_illuminant +STARTLINE}
+ addUserKnob {6 BlinkScript22_hellwig2022_HK_mode l HK_mode -STARTLINE}
+ BlinkScript22_hellwig2022_HK_mode true
+ addUserKnob {6 BlinkScript22_hellwig2022_linear_extension l linear_extension -STARTLINE}
+ addUserKnob {6 BlinkScript22_hellwig2022_compressMode l compressMode -STARTLINE}
+ BlinkScript22_hellwig2022_compressMode true
+ addUserKnob {4 BlinkScript22_hellwig2022_viewingConditions l viewingCondition M {Dark Dim Average ""}}
+ BlinkScript22_hellwig2022_viewingConditions Average
+ addUserKnob {26 "" +STARTLINE}
+ addUserKnob {41 format T PlotChromaticities8.format}
+ addUserKnob {7 edgeZoom R 0 200}
+ edgeZoom 40
+ addUserKnob {3 fontSize}
+ fontSize 40
+}
+ Input {
+  inputs 0
+  name XYZ
+  xpos 1053
+  ypos 171
+ }
+ Dot {
+  name Dot13
+  xpos 1087
+  ypos 283
+ }
+set N481d1c00 [stack 0]
+ BlinkScript {
+  kernelSourceFile /Users/afry/GitHub/nukeHellwig2022/hellwig2022_mods.blink
+  recompileCount 271
+  ProgramGroup 1
+  KernelDescription "2 \"hellwig2022\" iterate pixelWise 44722c1d8e7b87553424db73c2d0ba5fecf6b1a8012c8bd50f81c738fbf505f9 2 \"src\" Read Point \"dst\" Write Point 17 \"direction\" Int 1 AAAAAA== \"catDataSelection\" Int 1 AAAAAA== \"XYZ_w\" Float 3 AAAAAAAAAAAAAAAAAAAAAA== \"XYZ_w_scaler\" Float 1 AAAAAA== \"L_A\" Float 1 AAAAAA== \"Y_b\" Float 1 AAAAAA== \"L_B\" Float 3 AAAAAAAAAAAAAAAAAAAAAA== \"userSurround\" Float 3 AAAAAAAAAAAAAAAAAAAAAA== \"discount_illuminant\" Bool 1 AA== \"HK_mode\" Bool 1 AA== \"linear_extension\" Bool 1 AA== \"compressMode\" Bool 1 AA== \"viewingConditions\" Int 1 AAAAAA== \"rxy\" Float 2 AAAAAAAAAAA= \"gxy\" Float 2 AAAAAAAAAAA= \"bxy\" Float 2 AAAAAAAAAAA= \"wxy\" Float 2 AAAAAAAAAAA= 17 \"direction\" 1 1 \"catDataSelection\" 1 1 \"XYZ_w\" 3 1 \"XYZ_w_scaler\" 1 1 \"L_A\" 1 1 \"Y_b\" 1 1 \"L_B\" 3 1 \"userSurround\" 3 1 \"discount_illuminant\" 1 1 \"HK_mode\" 1 1 \"linear_extension\" 1 1 \"compressMode\" 1 1 \"viewingConditions\" 1 1 \"rxy\" 2 1 \"gxy\" 2 1 \"bxy\" 2 1 \"wxy\" 2 1 3 \"HALF_MIN\" Float 1 1 AAAAAA== \"HALF_MAX\" Float 1 1 AAAAAA== \"CAT_CAT16\" Float 9 1 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  kernelSource "\nkernel hellwig2022 : ImageComputationKernel<ePixelWise>\n\{\n  Image<eRead, eAccessPoint, eEdgeClamped> src; // the input image\n  Image<eWrite> dst; // the output image\n\n  param:\n\n    // the kernel parameters\n    int direction; // the direction of the convolution\n    int catDataSelection; // original vs modified CAT16 matrix\n\n    float3 XYZ_w;\n    float XYZ_w_scaler;\n    float L_A;\n    float Y_b;\n    float3 L_B;\n    float3 userSurround;\n    bool discount_illuminant;\n    bool HK_mode;\n    bool linear_extension;\n    bool compressMode;\n    int viewingConditions;\n\n    // xy coordintes for custom CAT matrix\n    float2 rxy;\n    float2 gxy;\n    float2 bxy;\n    float2 wxy;\n\n\n  local:\n    float HALF_MIN;\n    float HALF_MAX;\n\n    float3x3 CAT_CAT16;\n\n\n  void define()\n  \{\n\n  \}\n\n  // multiplies a 3D vector with a 3x3 matrix\n  float3 vector_dot( float3x3 m, float3 v)\n  \{\n    float3 r = 1.0f;\n    for(int c = 0; c<3; c++)\n    \{\n      r\[c] = m\[c]\[0]*v.x + m\[c]\[1]*v.y + m\[c]\[2]*v.z;\n    \}\n\n    return r;\n  \}\n\n  // linear interpolation between two values a & b with the bias t\n  float lerp(float a, float b, float t)\n  \{\n    return a + t * (b - a);\n  \}\n\n        // \"safe\" power function to avoid NANs or INFs when taking a fractional power of a negative base\n    // this one initially returned -pow(abs(b), e) for negative b\n    // but this ended up producing undesirable results in some cases\n    // so now it just returns 0.0 instead\n    float spow( float base, float exponent )\n    \{\n        if(base < 0.0f && exponent != floor(exponent) )\n        \{\n        return 0.0f;\n        \}\n        else\n        \{\n        return pow(base, exponent); \n        \}\n    \}\n\n    float3 float3spow( float3 base, float exponent )\n    \{\n        return float3(spow(base.x, exponent), spow(base.y, exponent), spow(base.z, exponent));\n    \}\n\n    float3 float3sign( float3 v )\n    \{\n        return float3(sign(v.x), sign(v.y), sign(v.z));\n    \}\n\n\n    // \"safe\" div\n    float sdiv( float a, float b )\n    \{\n        if(b == 0.0f)\n        \{\n        return 0.0f;\n        \}\n        else\n        \{\n        return a / b;\n        \}\n    \}\n    \n\n    // convert radians to degrees\n    float degrees( float radians )\n    \{\n      return radians * 180.0f / PI;\n    \}\n\n    float abs( float a )\n    \{\n      return fabs(a);\n    \}\n\n    float3 float3abs( float3 a )\n    \{\n      return fabs(a);\n    \}\n  \n\n  // get the y value of f(x) where the fuction is defined as a line between two points\n  // the two points as passed as an array \[a.x, a.y, b.x, b.y]\n  float lerp1D( float4 table, float x)\n  \{\n    float m = (table.w-table.y) / (table.z-table.x);\n    float c = table.y - (m*table.x);\n    float y = x*m+c;\n    return y;\n  \}\n\n  float3 float3_to_domain_100( float3 v )\n  \{\n    return v;\n  \}\n  \n\n\n  float hue_angle( float a, float b )\n  \{\n    // \"\"\"\n    // Return the *hue* angle :math:`h` in degrees.\n\n    // Parameters\n    // ----------\n    // a\n    //     Opponent colour dimension :math:`a`.\n    // b\n    //     Opponent colour dimension :math:`b`.\n\n    // Returns\n    // -------\n    // :class:`numpy.floating` or :class:`numpy.ndarray`\n    //     *Hue* angle :math:`h` in degrees.\n\n    // Examples\n    // --------\n    // >>> a = -0.000624112068243\n    // >>> b = -0.000506270106773\n    // >>> hue_angle(a, b)  # doctest: +ELLIPSIS\n    // 219.0484326...\n    // \"\"\"\n\n    // a = as_float_array(a);\n    // b = as_float_array(b);\n\n    float h = degrees(atan2(b, a)) / 360;\n\n    return h;\n  \}\n\n  float clip(float x, float a, float b)\n  \{\n    return max(a, min(x, b));\n  \}\n\n  float mod(float a, float N)\n  \{\n    return a - N*floor(a/N);\n  \} \n\n  float radians(float a)\n  \{\n    return a * PI / 180.0f;\n  \}\n\n\n\n  float3 compress(float3 xyz)\n  \{\n    \n    float x = xyz.x;\n    float y = xyz.y;\n    float z = xyz.z;\n    \n    float C = (x+y+z)/3;\n    float R = sqrt(pow((x-C),2) + pow((y-C),2) + pow((z-C),2)) ;\n    // np.sqrt(2/3)\n    // 0.816496580927726\n    R = R * 0.816496580927726;\n    \n    if (R != 0.0)\n    \{\n      x = (x-C)/R ;\n      y = (y-C)/R ;\n      z = (z-C)/R ;\n    \}\n      \n    float r = R/C ;\n    float s = -min(x, min(y, z));\n    \n    float t = 0.0;\n    if (r != 0.0)\n    \{\n      t =  1/(0.5+spow((spow((s-0.5),2) + spow((sqrt(4/spow(r,2)+1)-1),2)/4),0.5));\n    \}\n    \n    x = C*x*t + C ;\n    y = C*y*t + C ;\n    z = C*z*t + C ;\n    \n    return float3(x,y,z);\n  \}\n\n\nfloat3 uncompress(float3 xyz)\n\{\n\n  \n  float x = xyz.x;\n  float y = xyz.y;\n  float z = xyz.z;\n  \n  float C = (x+y+z)*(1.0/3.0) ;\n  float R = sqrt(pow((x-C),2) + pow((y-C),2) + pow((z-C),2));\n  // np.sqrt(2/3)\n  // 0.816496580927726\n  R = R * 0.816496580927726;\n  \n  if (R != 0.0)\n  \{\n    x = (x-C)/R ;\n    y = (y-C)/R ;\n    z = (z-C)/R ;\n  \}\n\n  float t = R/C ;\n  float s = -min(x, min(y, z));\n  \n  float r = 0.0;\n  if (t != 0.0)\n  \{\n    r = 2/sqrt(spow((2*sqrt(spow((1/t-0.5),2)-spow((s-0.5),2))+1),2)-1);\n  \}\n  \n  x = C*x*r + C ;\n  y = C*y*r + C ;\n  z = C*z*r + C ;\n  \n  return float3(x,y,z);\n\}\n\n\n\n\n\n  float hue_angle_dependency_Hellwig2022(float h)\n  \{\n    // \"\"\"\n    // Compute the hue angle dependency of the *Helmholtz–Kohlrausch* effect.\n    // Parameters\n    // ----------\n    // h\n    //     Hue :math:`h` angle in degrees.\n    // Returns\n    // -------\n    // :class:`numpy.floating` or :class:`numpy.ndarray`\n    //     Hue angle dependency.\n    // Examples\n    // --------\n    // >>> hue_angle_dependency_Hellwig2022(219.0484326582719)\n    // ... # doctest: +ELLIPSIS\n    // 0.8962565...\n    // \"\"\"\n\n    // h = as_float_array(h)\n    return float(         \\\n     -0.160 * cos(h)      \\\n    + 0.132 * cos(2 * h)  \\\n    - 0.405 * sin(h)      \\\n    + 0.080 * sin(2 * h)  \\ \n    + 0.792               \\\n    );\n\n    // return float( -0.160f * cos(h) + 0.132f * cos(2.0f * h)  - 0.405f * sin(h)  + 0.080f * sin(2.0f * h) + 0.792f );\n    \}\n\n\n  float3x3  RGBPrimsToXYZMatrix(float2 rxy, float2 gxy, float2 bxy, float2 wxy,float Y, bool direction)\n  \{\n    // # given r g b chromaticities and whitepoint, convert RGB colors to XYZ\n    // # based on CtlColorSpace.cpp from the CTL source code : 77\n    // # param: xy - dict of chromaticity xy coordinates: rxy: float2(x, y) etc\n    // # param: Y - luminance of \"white\" - defaults to 1.0\n    // # param: inverse - calculate XYZ to RGB instead\n\n    float2 r = rxy;\n    float2 g = gxy;\n    float2 b = bxy;\n    float2 w = wxy;\n\n    float X = w.x * Y / w.y;\n    float Z = (1 - w.x - w.y) * Y / w.y;\n\n    // # Scale factors for matrix rows\n    float d = r.x * (b.y - g.y) + b.x * (g.y - r.y) + g.x * (r.y - b.y);\n\n    float Sr =    (X * (b.y - g.y) -      \\\n            g.x * (Y * (b.y - 1.0f) +  \\\n            b.y  * (X + Z)) +       \\\n            b.x  * (Y * (g.y - 1.0f) + \\\n            g.y * (X + Z))) / d ;\n    \n    float Sg =    (X * (r.y - b.y) +      \\\n            r.x * (Y * (b.y - 1.0f) +  \\\n            b.y * (X + Z)) -        \\\n            b.x * (Y * (r.y - 1.0f) +  \\\n            r.y * (X + Z))) / d ;\n\n    float Sb =    (X * (g.y - r.y) -      \\\n            r.x * (Y * (g.y - 1.0f) +  \\\n            g.y * (X + Z)) +        \\\n            g.x * (Y * (r.y - 1.0f) +  \\\n            r.y * (X + Z))) / d ;\n\n    // # Assemble the matrix\n    float Mdata\[] =\n    \{\n            Sr * r.x, Sr * r.y, Sr * (1.0f - r.x - r.y),\n            Sg * g.x, Sg * g.y, Sg * (1.0f - g.x - g.y),\n            Sb * b.x, Sb * b.y, Sb * (1.0f - b.x - b.y),\n    \};\n\n    float MdataNukeOrder\[] = \{\n      Mdata\[0], Mdata\[3], Mdata\[6],\n      Mdata\[1], Mdata\[4], Mdata\[7],\n      Mdata\[2], Mdata\[5], Mdata\[8],\n    \};\n\n    float3x3 newMatrix;\n    newMatrix.setArray(MdataNukeOrder);\n\n    // create inverse matrix\n    float3x3 newMatrixInverse = newMatrix.invert();\n\n    // return forward or inverse matrix\n    if (direction == 0)\n    \{\n      return newMatrix;\n    \}\n    else if (direction == 1)\n    \{\n      return newMatrixInverse;\n    \}\n  \}\n\n\n  float achromatic_response_forward(float3 RGB)\n  \{\n    //   \"\"\"\n    //   Return the achromatic response :math:`A` from given compressed\n    //   *CAM16* transform sharpened *RGB* array and :math:`N_\{bb\}` chromatic\n    //   induction factor for forward *Hellwig and Fairchild (2022)* implementation.\n\n    //   Parameters\n    //   ----------\n    //   RGB\n    //       Compressed *CAM16* transform sharpened *RGB* array.\n\n    //   Returns\n    //   -------\n    //   :class:`numpy.floating` or :class:`numpy.ndarray`\n    //       Achromatic response :math:`A`.\n\n    //   Examples\n    //   --------\n    //   >>> RGB = np.array(\[7.94634384, 7.94713791, 7.9488967])\n    //   >>> achromatic_response_forward(RGB)  # doctest: +ELLIPSIS\n    //   23.9322704...\n    //   \"\"\"\n\n    float R = RGB.x;\n    float G = RGB.y;\n    float B = RGB.z;\n\n\n    float A = 2 * R + G + 0.05 * B - 0.305;\n\n    return A;\n  \}\n\n  float colourfulness_correlate(float N_c,float e_t,float a,float b) \n  \{\n    // \"\"\"\n    // Return the *colourfulness* correlate :math:`M`.\n\n    // Parameters\n    // ----------\n    // N_c\n    //     Surround chromatic induction factor :math:`N_\{c\}`.\n    // e_t\n    //     Eccentricity factor :math:`e_t`.\n    // a\n    //     Opponent colour dimension :math:`a`.\n    // b\n    //     Opponent colour dimension :math:`b`.\n\n    // Returns\n    // -------\n    // :class:`numpy.floating` or :class:`numpy.ndarray`\n    //     *Colourfulness* correlate :math:`M`.\n\n    // Examples\n    // --------\n    // >>> N_c = 1\n    // >>> e_t = 1.13423124867\n    // >>> a = -0.00063418423001\n    // >>> b = -0.000479072513542\n    // >>> colourfulness_correlate(N_c, e_t, a, b)  # doctest: +ELLIPSIS\n    // 0.0387637...\n    // \"\"\"\n\n    // N_c = as_float_array(N_c)\n    // e_t = as_float_array(e_t)\n    // a = as_float_array(a)\n    // b = as_float_array(b)\n\n    float M = 43 * N_c * e_t * sqrt(pow(a,2) + pow(b,2));\n\n    return M;\n  \}\n\n\n\n  float degree_of_adaptation(float  F, float L_A )\n    \{\n    // \"\"\"\n    // Return the degree of adaptation :math:`D` from given surround maximum\n    // degree of adaptation :math:`F` and adapting field *luminance* :math:`L_A`\n    // in :math:`cd/m^2`.\n\n    // Parameters\n    // ----------\n    // F\n    //     Surround maximum degree of adaptation :math:`F`.\n    // L_A\n    //     Adapting field *luminance* :math:`L_A` in :math:`cd/m^2`.\n\n    // Returns\n    // -------\n    // :class:`numpy.floating` or :class:`numpy.ndarray`\n    //     Degree of adaptation :math:`D`.\n\n    // Examples\n    // --------\n    // >>> degree_of_adaptation(1.0, 318.31)  # doctest: +ELLIPSIS\n    // 0.9944687...\n    // \"\"\"\n\n    // F = as_float_array(F)\n    // L_A = as_float_array(L_A)\n\n    float D = F * (1 - (1 / 3.6) * exp((-L_A - 42) / 92));\n\n    return D;\n    \}\n\n\n\n    // def d_post_adaptation_non_linear_response_compression_forward(\n    //     RGB: ArrayLike, F_L: FloatingOrArrayLike\n    // ) -> NDArray:\n    //     F_L_RGB = spow(F_L\[..., np.newaxis] * RGB / 100, 0.42)\n    //     F_L_100 = spow(F_L\[..., np.newaxis] / 100, 0.42)\n    \n    //     d_RGB_a = (\n    //         400\n    //         * ((0.42 * 27.13) * spow(RGB, -0.58) * F_L_100)\n    //         / (F_L_RGB + 27.13) ** 2\n    //     )\n    \n    //     return d_RGB_a\n\n    // ** example\n        // (a**2 + b**2)\n        // (a * a + b * b);\n    \n\n\n\n        \n    // def post_adaptation_non_linear_response_compression_forward(\n    //     RGB: ArrayLike, F_L: FloatingOrArrayLike\n    // ) -> NDArray:\n\n\n    //     RGB = as_float_array(RGB)\n    //     F_L = as_float_array(F_L)\n\n    //     F_L_RGB = spow(F_L\[..., np.newaxis] * np.absolute(RGB) / 100, 0.42)\n    //     RGB_c = (400 * np.sign(RGB) * F_L_RGB) / (27.13 + F_L_RGB) + 0.1\n\n    //     return RGB_c\n\n\n    float3 post_adaptation_non_linear_response_compression_forward(float3 RGB, float F_L)\n    \{\n        // RGB = as_float_array(RGB)\n        // F_L = as_float_array(F_L)\n    \n        float3 F_L_RGB = float3spow(F_L * float3abs(RGB) / 100.0f, 0.42f);\n        float3 RGB_c = (400.0f * sign(RGB) * F_L_RGB) / (27.13f + F_L_RGB) + 0.1f;\n    \n        return RGB_c;\n    \}\n\n    float3 viewingConditionsToSurround(int viewingConditions)\n    \{\n        float3 newSurround;\n        // hack to turn incoming int value into surround coeffs\n        if (viewingConditions == 0)\n        \{\n            // \"Dark\": InductionFactors_CIECAM02(0.8, 0.525, 0.8),\n            newSurround = float3(0.8, 0.525, 0.8);\n        \}\n        else if (viewingConditions == 1)\n        \{\n            // \"Dim\": InductionFactors_CIECAM02(0.9, 0.59, 0.9),\n            newSurround = float3(0.9, 0.59, 0.9);\n        \}\n        else if (viewingConditions == 2)\n        \{\n            // \"Average\": InductionFactors_CIECAM02(1, 0.69, 1),\n            newSurround = float3(1.0, 0.69, 1.0);\n        \}\n        else if (viewingConditions == 3)\n        \{\n            // Pull from external input\n            newSurround = userSurround;\n        \}\n        return newSurround;\n    \}\n\n    \n    float3 post_adaptation_non_linear_response_compression_inverse(float3 RGB,float F_L)\n    \{\n        // RGB = as_float_array(RGB)\n        // F_L = as_float_array(F_L)\n\n\n        // RGB_p = (\n        //     np.sign(RGB - 0.1)\n        //     * 100\n        //     / F_L\[..., np.newaxis]\n        //     * spow(\n        //         (27.13 * np.absolute(RGB - 0.1)) / (400 - np.absolute(RGB - 0.1)),\n        //         1 / 0.42,\n        //     )\n        // )\n\n\n        // RGB_p = ( np.sign(RGB - 0.1) * 100 / F_L\[..., np.newaxis] * spow( (27.13 * np.absolute(RGB - 0.1)) / (400 - np.absolute(RGB - 0.1)), 1 / 0.42, ))\n\n        // older compression formula subbed in\n        // float3 RGB_p =   float3sign(RGB) * 100.0f / F_L        * float3spow((27.13f * float3abs(RGB)) / (400.0f - float3abs(RGB)), 1.0f / 0.42f);\n\n        // float3 RGB_p =  sign(RGB - 0.1f) * 100.0f / F_L * spow((27.13f * float3abs(RGB - 0.1f)) / (400.0f - float3abs(RGB - 0.1f)), 1.0f / 0.42f);\n        float3 RGB_p =  (float3sign(RGB - 0.1f) * 100.0f / F_L * float3spow((27.13f * float3abs(RGB - 0.1f)) / (400.0f - float3abs(RGB - 0.1f)), 1.0f / 0.42f) );\n        // float3 RGB_p =   float3sign(RGB) * 100.0f / F_L        * float3spow((27.13f * float3abs(RGB)) / (400.0f - float3abs(RGB)), 1.0f / 0.42f);\n        return RGB_p;\n    \}\n\n\n    // def d_post_adaptation_non_linear_response_compression_forward(\n    //     RGB: ArrayLike, F_L: FloatingOrArrayLike\n    // ) -> NDArray:\n    //     F_L_RGB = spow(F_L\[..., np.newaxis] * RGB / 100, 0.42)\n    //     F_L_100 = spow(F_L\[..., np.newaxis] / 100, 0.42)\n    \n    //     d_RGB_a = (  400 * ((0.42 * 27.13) * spow(RGB, -0.58) * F_L_100) / (F_L_RGB + 27.13) ** 2  )\n    \n    //     return d_RGB_a\n    \n    \n    float3 d_post_adaptation_non_linear_response_compression_forward( float3 RGB, float F_L)\n    \{\n        float3 F_L_RGB = float3spow(F_L * RGB / 100.0f, 0.42f);\n        float F_L_100 = spow(F_L / 100.0f, 0.42f);\n    \n        // float3 d_RGB_a = ( 400.0f * ((0.42f * 27.13f) * float3spow(RGB, -0.58f) * F_L_100)/ (F_L_RGB + 27.13f) ** 2.0f );\n           float3 d_RGB_a = ( 400.0f * ((0.42f * 27.13f) * float3spow(RGB, -0.58f) * F_L_100)/ ( (F_L_RGB + 27.13f) *  (F_L_RGB + 27.13f) ));\n        //    d_RGB_a = d_RGB_a * d_RGB_a;\n\n        return d_RGB_a;\n    \}\n\n\n  \n    float3 XYZ_to_Hellwig2022_JMh( float3 XYZ, float3 XYZ_w, float L_A, float Y_b, float3 surround, bool discount_illuminant)\n    \{\n    //     \"\"\"\n    //     Compute the *Hellwig and Fairchild (2022)* colour appearance model\n    //     correlates from given *CIE XYZ* tristimulus values.\n\n    //     Parameters\n    //     ----------\n    //     XYZ\n    //         *CIE XYZ* tristimulus values of test sample / stimulus.\n    //     XYZ_w\n    //         *CIE XYZ* tristimulus values of reference white.\n    //     L_A\n    //         Adapting field *luminance* :math:`L_A` in :math:`cd/m^2`, (often taken\n    //         to be 20% of the luminance of a white object in the scene).\n    //     Y_b\n    //         Luminous factor of background :math:`Y_b` such as\n    //         :math:`Y_b = 100 x L_b / L_w` where :math:`L_w` is the luminance of the\n    //         light source and :math:`L_b` is the luminance of the background. For\n    //         viewing images, :math:`Y_b` can be the average :math:`Y` value for the\n    //         pixels in the entire image, or frequently, a :math:`Y` value of 20,\n    //         approximate an :math:`L^*` of 50 is used.\n    //     surround\n    //         Surround viewing conditions induction factors.\n    //     discount_illuminant\n    //         Truth value indicating if the illuminant should be discounted.\n\n    //     Returns\n    //     -------\n    //     :class:`colour.CAM_Specification_Hellwig2022`\n    //         *Hellwig and Fairchild (2022)* colour appearance model specification.\n\n    //     Notes\n    //     -----\n    //     +------------+-----------------------+---------------+\n    //     | **Domain** | **Scale - Reference** | **Scale - 1** |\n    //     +============+=======================+===============+\n    //     | ``XYZ``    | \[0, 100]              | \[0, 1]        |\n    //     +------------+-----------------------+---------------+\n    //     | ``XYZ_w``  | \[0, 100]              | \[0, 1]        |\n    //     +------------+-----------------------+---------------+\n\n    //     +-------------------------------------+-----------------------+-----------\\\n    // ----+\n    //     | **Range**                           | **Scale - Reference** | **Scale - \\\n    // 1** |\n    //     +=====================================+=======================+===========\\\n    // ====+\n    //     | ``CAM_Specification_Hellwig2022.J`` | \[0, 100]              | \[0, 1]    \\\n    //     |\n    //     +-------------------------------------+-----------------------+-----------\\\n    // ----+\n    //     | ``CAM_Specification_Hellwig2022.C`` | \[0, 100]              | \[0, 1]    \\\n    //     |\n    //     +-------------------------------------+-----------------------+-----------\\\n    // ----+\n    //     | ``CAM_Specification_Hellwig2022.h`` | \[0, 360]              | \[0, 1]    \\\n    //     |\n    //     +-------------------------------------+-----------------------+-----------\\\n    // ----+\n    //     | ``CAM_Specification_Hellwig2022.s`` | \[0, 100]              | \[0, 1]    \\\n    //     |\n    //     +-------------------------------------+-----------------------+-----------\\\n    // ----+\n    //     | ``CAM_Specification_Hellwig2022.Q`` | \[0, 100]              | \[0, 1]    \\\n    //     |\n    //     +-------------------------------------+-----------------------+-----------\\\n    // ----+\n    //     | ``CAM_Specification_Hellwig2022.M`` | \[0, 100]              | \[0, 1]    \\\n    //     |\n    //     +-------------------------------------+-----------------------+-----------\\\n    // ----+\n    //     | ``CAM_Specification_Hellwig2022.H`` | \[0, 400]              | \[0, 1]    \\\n    //     |\n    //     +-------------------------------------+-----------------------+-----------\\\n    // ----+\n\n    //     References\n    //     ----------\n    //     :cite:`Fairchild2022`, :cite:`Hellwig2022`\n\n    //     Examples\n    //     --------\n    //     >>> XYZ = np.array(\[19.01, 20.00, 21.78])\n    //     >>> XYZ_w = np.array(\[95.05, 100.00, 108.88])\n    //     >>> L_A = 318.31\n    //     >>> Y_b = 20.0\n    //     >>> surround = VIEWING_CONDITIONS_Hellwig2022\['Average']\n    //     >>> XYZ_to_Hellwig2022(XYZ, XYZ_w, L_A, Y_b, surround)\n    //     ... # doctest: +ELLIPSIS\n    //     CAM_Specification_Hellwig2022(J=41.7312079..., C=0.0257636..., \\\n    // h=217.0679597..., s=0.0608550..., Q=55.8523226..., M=0.0339889..., \\\n    // H=275.5949861..., HC=None)\n    //     \"\"\"\n\n\n        XYZ = float3_to_domain_100(XYZ);\n        XYZ_w = float3_to_domain_100(XYZ_w) * XYZ_w_scaler;\n        float _X_w = XYZ_w.x ;\n        float Y_w = XYZ_w.y ;\n        float _Z_w = XYZ_w.z ;\n        // L_A = as_float_array(L_A)\n        // Y_b = as_float_array(Y_b)\n\n        // # Step 0\n        // # Converting *CIE XYZ* tristimulus values to sharpened *RGB* values.\n        float3x3 MATRIX_16 = CAT_CAT16;\n        float3 RGB_w = vector_dot(MATRIX_16, XYZ_w);\n\n        // # Computing degree of adaptation :math:`D`.\n        float D = clip(degree_of_adaptation(surround.x, L_A), 0, 1);\n        if(discount_illuminant)\n        \{\n            D = 1.0f;\n        \}\n\n\n        // # Viewing conditions dependent parameters\n        float k = 1 / (5 * L_A + 1);\n        float k4 = pow(k,4);\n        float F_L = 0.2f * k4 * (5.0f * L_A) + 0.1f * pow((1.0f - k4), 2.0f) * spow(5.0f * L_A, 1.0f / 3.0f) ;\n        float n = sdiv(Y_b, Y_w);\n        float z = 1.48 + sqrt(n);\n\n        // // float D_RGB = ( D\[..., np.newaxis] * Y_w\[..., np.newaxis] / RGB_w + 1 - D\[..., np.newaxis] )\n        float3 D_RGB = D * Y_w / RGB_w + 1 - D;\n        float3 RGB_wc = D_RGB * RGB_w;\n        \n        // # Applying forward post-adaptation non-linear response compression.\n        // F_L_RGB = spow(F_L\[..., np.newaxis] * np.absolute(RGB_wc) / 100, 0.42)\n        float3 F_L_RGB = float3spow(F_L * float3abs(RGB_wc) / 100.0f, 0.42f);\n\n        // # Computing achromatic responses for the whitepoint.\n        // RGB_aw = (400 * np.sign(RGB_wc) * F_L_RGB) / (27.13 + F_L_RGB) + 0.1\n        float3 RGB_aw = (400.0f * float3sign(RGB_wc) * F_L_RGB) / (27.13f + F_L_RGB) + 0.1f;\n        \n\n        // # Computing achromatic responses for the whitepoint.\n        // R_aw, G_aw, B_aw = tsplit(RGB_aw)\n        float R_aw = RGB_aw.x ;\n        float G_aw = RGB_aw.y ;\n        float B_aw = RGB_aw.z ;\n        // A_w = 2 * R_aw + G_aw + 0.05 * B_aw - 0.305\n        float A_w = 2 * R_aw + G_aw + 0.05f * B_aw - 0.305f;\n\n        // # Step 1\n        // # Converting *CIE XYZ* tristimulus values to sharpened *RGB* values.\n        // RGB = vector_dot(MATRIX_16, XYZ)\n\n        float3 RGB = vector_dot(MATRIX_16, XYZ);\n        // float3 RGB = XYZ;\n\n        // # Step 2\n        // RGB_c = D_RGB * RGB\n        float3 RGB_c = D_RGB * RGB;\n\n        // # Step 3\n        // # Applying forward post-adaptation non-linear response compression.\n        // // F_L_RGB = spow(F_L\[..., np.newaxis] * np.absolute(RGB_c) / 100, 0.42)\n        // float3 F_L_RGB_2 = float3spow(F_L * float3abs(RGB_c) / 100.0f, 0.42f);\n        // // RGB_a = (400 * np.sign(RGB_c) * F_L_RGB) / (27.13 + F_L_RGB) + 0.1\n        // float3 RGB_a = (400.0f * float3sign(RGB_c) * F_L_RGB_2) / (27.13f + F_L_RGB_2) + 0.1f;\n\n\n        // # Step 3\n        // # Applying forward post-adaptation non-linear response compression.\n        // RGB_a = post_adaptation_non_linear_response_compression_forward(RGB_c, F_L)\n        // RGB_a_l = d_post_adaptation_non_linear_response_compression_forward(\n        //     full(3, L_B), F_L\n        // ) * (\n        //     RGB_c - L_B\n        // ) + post_adaptation_non_linear_response_compression_forward(\n        //     full(3, L_B), F_L\n        // )\n        // RGB_a = np.where(RGB_c < L_B, RGB_a_l, RGB_a)\n\n\n        if (compressMode)\n        \{\n          RGB_c = compress(RGB_c);\n        \}\n\n        float3 RGB_a = post_adaptation_non_linear_response_compression_forward(RGB_c, F_L);\n\n        if (compressMode)\n        \{\n          RGB_a = uncompress(RGB_a);\n        \}\n\n\n        // # Step 3\n        // # Applying forward post-adaptation non-linear response compression.\n        // float3 RGB_a = RGB_c;\n        // float3 RGB_a_l = d_post_adaptation_non_linear_response_compression_forward(L_B, F_L) * ( RGB_c - L_B) + post_adaptation_non_linear_response_compression_forward( L_B, F_L );\n        if (linear_extension)\n        \{\n\n          float3 RGB_a_l = d_post_adaptation_non_linear_response_compression_forward(\n            L_B, F_L\n            ) * (\n              RGB_c - L_B\n              ) + post_adaptation_non_linear_response_compression_forward(\n                L_B, F_L\n                );\n                \n                // float3 RGB_d;\n                RGB_a.x = RGB_c.x < L_B.x ? RGB_a_l.x: RGB_a.x;\n                RGB_a.y = RGB_c.y < L_B.y ? RGB_a_l.y: RGB_a.y;\n                RGB_a.z = RGB_c.z < L_B.z ? RGB_a_l.z: RGB_a.z;       \n        \}\n\n\n\n        // # Step 4\n        // # Converting to preliminary cartesian coordinates.\n        // R_a, G_a, B_a = tsplit(RGB_a)\n        float R_a = RGB_a.x ;\n        float G_a = RGB_a.y ;\n        float B_a = RGB_a.z ;\n        // a = R_a - 12 * G_a / 11 + B_a / 11\n        float a = R_a - 12.0f * G_a / 11.0f + B_a / 11.0f;\n        // b = (R_a + G_a - 2 * B_a) / 9\n        float b = (R_a + G_a - 2.0f * B_a) / 9.0f;\n\n        // # Computing the *hue* angle :math:`h`.\n        // h = np.degrees(np.arctan2(b, a)) % 360\n        // Unclear why this isnt matching the python version.\n        float h = mod(degrees(atan2(b, a)), 360.0f);\n\n        \n\n        // # Step 5\n        // # Computing eccentricity factor *e_t*.\n        // hr = np.radians(h)\n        float hr = radians(h);\n\n        // _h = hr\n        // _2_h = 2 * hr\n        // _3_h = 3 * hr\n        // _4_h = 4 * hr\n        float _h = hr;\n        float _2_h = 2 * hr;\n        float _3_h = 3 * hr;\n        float _4_h = 4 * hr;\n\n        // e_t = (\n        //     -0.0582 * np.cos(_h)\n        //     - 0.0258 * np.cos(_2_h)\n        //     - 0.1347 * np.cos(_3_h)\n        //     + 0.0289 * np.cos(_4_h)\n        //     - 0.1475 * np.sin(_h)\n        //     - 0.0308 * np.sin(_2_h)\n        //     + 0.0385 * np.sin(_3_h)\n        //     + 0.0096 * np.sin(_4_h)\n        //     + 1\n        // )\n        float e_t = (\n            -0.0582f * cos(_h)\n            - 0.0258f * cos(_2_h)\n            - 0.1347f * cos(_3_h)\n            + 0.0289f * cos(_4_h)\n            - 0.1475f * sin(_h)\n            - 0.0308f * sin(_2_h)\n            + 0.0385f * sin(_3_h)\n            + 0.0096f * sin(_4_h)\n            + 1.0f\n        );\n\n        // # Step 6\n        // # Computing achromatic responses for the stimulus.\n        // R_a, G_a, B_a = tsplit(RGB_a)\n        float R_a2 = RGB_a.x ;\n        float G_a2 = RGB_a.y ;\n        float B_a2 = RGB_a.z ;\n        // A = 2 * R_a + G_a + 0.05 * B_a - 0.305\n        float A = 2 * R_a2 + G_a2 + 0.05f * B_a2 - 0.305f;\n\n        // # Step 7\n        // # Computing the correlate of *Lightness* :math:`J`.\n        // with sdiv_mode():\n        //     J = 100 * spow(sdiv(A, A_w), surround.c * z)\n\n        float J = 100.0f * spow(sdiv(A, A_w), surround.y * z);\n\n        // # Step 8\n        // # Computing the correlate of *brightness* :math:`Q`.\n        // with sdiv_mode():\n        //     Q = (2 / as_float(surround.c)) * (J / 100) * A_w\n        float Q = (2.0f / float(surround.y)) * (J / 100.0f) * A_w;\n\n        // # Step 9\n        // # Computing the correlate of *colourfulness* :math:`M`.\n        // M = 43 * surround.N_c * e_t * np.sqrt(a**2 + b**2)\n        float M = 43.0f * surround.z * e_t * sqrt(a * a + b * b);\n\n        // # Computing the correlate of *chroma* :math:`C`.\n        // with sdiv_mode():\n        //     C = 35 * sdiv(M, A_w)\n        float C = 35.0f * sdiv(M, A_w);\n\n\n        // # Computing the correlate of *saturation* :math:`s`.\n        // with sdiv_mode():\n        //     s = 100 * sdiv(M, Q)\n        float s = 100.0f * sdiv(M, Q);\n\n        // # *Helmholtz–Kohlrausch* Effect Extension.\n        float J_HK = J + hue_angle_dependency_Hellwig2022(hr) * spow(C, 0.587f);\n        float Q_HK = (2.0f / surround.y) * (J_HK / 100.0f) * A_w ;\n    \n        // return XYZ_w;\n        // return RGB_w;\n        // return \{D,k,k4\};\n        // return \{F_L,n,z\};\n        // return RGB_c;\n        if (HK_mode)\n        \{\n          return \{J_HK,M,h\};\n        \}\n        else\n        \{\n          return \{J,M,h\};\n        \}\n        // return XYZ;\n    \}\n\n    float3 Hellwig2022_JMh_to_XYZ( float3 JMh, float3 XYZ_w, float L_A, float Y_b, float3 surround, bool discount_illuminant)\n    \{\n        float J = JMh.x;\n        float M = JMh.y;\n        float h = JMh.z;\n        XYZ_w  = XYZ_w  * XYZ_w_scaler;\n  \n\n\n        // L_A = as_float_array(L_A)\n        // XYZ_w = to_domain_100(XYZ_w)\n        // _X_w, Y_w, _Z_w = tsplit(XYZ_w)\n        float _X_w = XYZ_w.x;\n        float Y_w = XYZ_w.y;\n        float _Z_w = XYZ_w.z;\n\n        // # Step 0\n        // # Converting *CIE XYZ* tristimulus values to sharpened *RGB* values.\n        // RGB_w = vector_dot(MATRIX_16, XYZ_w)\n        float3x3 MATRIX_16 = CAT_CAT16;\n        float3 RGB_w = vector_dot(MATRIX_16, XYZ_w);\n\n\n        // # Computing degree of adaptation :math:`D`.\n        float D = clip(degree_of_adaptation(surround.x, L_A), 0, 1);\n        if(discount_illuminant)\n        \{\n            D = 1.0f;\n        \}\n\n\n\n        // # Viewing conditions dependent parameters\n        float k = 1 / (5 * L_A + 1);\n        float k4 = pow(k,4);\n        float F_L = 0.2f * k4 * (5.0f * L_A) + 0.1f * pow((1.0f - k4), 2.0f) * spow(5.0f * L_A, 1.0f / 3.0f) ;\n        float n = sdiv(Y_b, Y_w);\n        float z = 1.48 + sqrt(n);\n\n        // // float D_RGB = ( D\[..., np.newaxis] * Y_w\[..., np.newaxis] / RGB_w + 1 - D\[..., np.newaxis] )\n        float3 D_RGB = D * Y_w / RGB_w + 1 - D;\n        float3 RGB_wc = D_RGB * RGB_w;\n        \n        // # Applying forward post-adaptation non-linear response compression.\n        // F_L_RGB = spow(F_L\[..., np.newaxis] * np.absolute(RGB_wc) / 100, 0.42)\n        float3 F_L_RGB = float3spow(F_L * float3abs(RGB_wc) / 100.0f, 0.42f);\n\n        // # Computing achromatic responses for the whitepoint.\n        // RGB_aw = (400 * np.sign(RGB_wc) * F_L_RGB) / (27.13 + F_L_RGB) + 0.1\n        float3 RGB_aw = (400.0f * float3sign(RGB_wc) * F_L_RGB) / (27.13f + F_L_RGB) + 0.1f;\n\n        // # Computing achromatic responses for the whitepoint.\n        // R_aw, G_aw, B_aw = tsplit(RGB_aw)\n        float R_aw = RGB_aw.x ;\n        float G_aw = RGB_aw.y ;\n        float B_aw = RGB_aw.z ;\n        // A_w = 2 * R_aw + G_aw + 0.05 * B_aw - 0.305\n        float A_w = 2 * R_aw + G_aw + 0.05f * B_aw - 0.305f;\n\n        // # Step 2\n        // # Computing eccentricity factor *e_t*.\n        // hr = np.radians(h)\n        float hr = radians(h);\n\n\n        // # *Helmholtz–Kohlrausch* Effect Extension.\n        float C = (M * 35) / A_w;\n         \n        if (HK_mode)\n        \{\n          J = J - hue_angle_dependency_Hellwig2022(hr) * spow(C, 0.587f);\n        \}\n\n\n\n        // _h = hr\n        // _2_h = 2 * hr\n        // _3_h = 3 * hr\n        // _4_h = 4 * hr\n        float _h = hr;\n        float _2_h = 2 * hr;\n        float _3_h = 3 * hr;\n        float _4_h = 4 * hr;\n    \n        // e_t = (\n        //     -0.0582 * np.cos(_h)\n        //     - 0.0258 * np.cos(_2_h)\n        //     - 0.1347 * np.cos(_3_h)\n        //     + 0.0289 * np.cos(_4_h)\n        //     - 0.1475 * np.sin(_h)\n        //     - 0.0308 * np.sin(_2_h)\n        //     + 0.0385 * np.sin(_3_h)\n        //     + 0.0096 * np.sin(_4_h)\n        //     + 1\n        // )\n        float e_t = (\n            -0.0582f * cos(_h)\n            - 0.0258f * cos(_2_h)\n            - 0.1347f * cos(_3_h)\n            + 0.0289f * cos(_4_h)\n            - 0.1475f * sin(_h)\n            - 0.0308f * sin(_2_h)\n            + 0.0385f * sin(_3_h)\n            + 0.0096f * sin(_4_h)\n            + 1.0f\n        );\n\n        // # Computing achromatic response :math:`A` for the stimulus.\n        // A = A = A_w * spow(J / 100, 1 / (surround.c * z))\n        float A = A_w * spow(J / 100.0f, 1.0f / (surround.y * z));\n\n        // # Computing *P_p_1* to *P_p_2*.\n        // P_p_1 = 43 * surround.N_c * e_t\n        // P_p_2 = A\n        float P_p_1 = 43.0f * surround.z * e_t;\n        float P_p_2 = A;\n\n\n        // # Step 3\n        // # Computing opponent colour dimensions :math:`a` and :math:`b`.\n        // with sdiv_mode():\n        //     gamma = M / P_p_1\n        float gamma = M / P_p_1;\n    \n        // a = gamma * np.cos(hr)\n        float a = gamma * cos(hr);\n        // b = gamma * np.sin(hr)\n        float b = gamma * sin(hr);\n\n\n        // # Step 4\n        // # Applying post-adaptation non-linear response compression matrix.\n        // RGB_a = (\n        //     vector_dot(\n        //         \[\n        //             \[460, 451, 288],\n        //             \[460, -891, -261],\n        //             \[460, -220, -6300],\n        //         ],\n        //         tstack(\[P_p_2, a, b]),\n        //     )\n        //     / 1403\n        // )\n\n        float panlrcm_data\[]=\n        \{\n            460.0f, 451.0f, 288.0f,\n            460.0f, -891.0f, -261.0f,\n            460.0f, -220.0f, -6300.0f,\n        \};\n        float3x3 panlrcm;\n        panlrcm.setArray(panlrcm_data);\n\n        float3 RGB_a = vector_dot(panlrcm, float3(P_p_2, a, b)) / 1403.0f;\n\n        // # Step 5\n        // # Applying inverse post-adaptation non-linear response compression.\n        // RGB_c = (\n        //     np.sign(RGB_a)\n        //     * 100\n        //     / F_L\[..., np.newaxis]\n        //     * spow(\n        //         (27.13 * np.absolute(RGB_a)) / (400 - np.absolute(RGB_a)),\n        //         1 / 0.42,\n        //     )\n        // )\n        // float3 RGB_c = float3sign(RGB_a) * 100.0f / F_L * float3spow((27.13f * float3abs(RGB_a)) / (400.0f - float3abs(RGB_a)), 1.0f / 0.42f);\n\n\n        // # Step 5\n        // # Applying inverse post-adaptation non-linear response compression.\n        // RGB_c = post_adaptation_non_linear_response_compression_inverse(RGB_a, F_L)\n        // RGB_c_l = (\n        //     RGB_a\n        //     - post_adaptation_non_linear_response_compression_forward(\n        //         full(3, L_B), F_L\n        //     )\n        // ) / (\n        //     d_post_adaptation_non_linear_response_compression_forward(\n        //         full(3, L_B), F_L\n        //     )\n        // ) + L_B\n        // RGB_c = np.where(RGB_c < L_B, RGB_c_l, RGB_c)\n\n        // Adding 0.1 here seems to fix the inversion issue, not really clear on why I'm needing to do this\n        // RGB_a = RGB_a + 0.1f;\n        if (compressMode)\n        \{\n          RGB_a = compress(RGB_a);\n        \}\n\n        float3 RGB_c = post_adaptation_non_linear_response_compression_inverse(RGB_a + 0.1, F_L);\n\n        if (compressMode)\n        \{\n          RGB_c = uncompress(RGB_c);\n        \}\n\n        // float3 RGB_c = RGB_a;\n        if (linear_extension)\n        \{\n          float3 RGB_c_l = ( RGB_a + 0.1 - post_adaptation_non_linear_response_compression_forward( L_B, F_L)) / (d_post_adaptation_non_linear_response_compression_forward( L_B, F_L)) + L_B;\n          \n          // float3 RGB_d;\n          RGB_c.x = RGB_c.x < L_B.x ? RGB_c_l.x : RGB_c.x;\n          RGB_c.y = RGB_c.y < L_B.y ? RGB_c_l.y : RGB_c.y;\n          RGB_c.z = RGB_c.z < L_B.z ? RGB_c_l.z : RGB_c.z;\n        \}\n\n\n        // # Step 6\n        // RGB = RGB_c / D_RGB\n        float3 RGB = RGB_c / D_RGB;\n        \n    \n        // # Step 7\n        // XYZ = vector_dot(MATRIX_INVERSE_16, RGB)\n        float3x3 MATRIX_INVERSE_16 = CAT_CAT16.invert();\n        float3 XYZ = vector_dot(MATRIX_INVERSE_16, RGB);\n\n\n        // return XYZ;\n        return XYZ;\n\n    \}\n\n\n\n\n\n\n  void init()\n  \{\n    HALF_MIN = 0.0000000596046448f;\n    HALF_MAX = 65504.0f;\n\n    float CAT_CAT16_data\[]=\n    \{\n      0.401288, 0.650173, -0.051461,\n      -0.250268, 1.204414, 0.045854,\n      -0.002079, 0.048952, 0.953127,\n    \};\n\n    float Modified_CAT16_data\[]=\n    \{\n      0.656619, 0.342071, 0.00131062,\n      -0.222571, 1.10658, 0.115987,\n      -0.000634146, 0.05855, 0.942084,\n    \};\n\n    if (catDataSelection == 0)\n    \{\n        CAT_CAT16.setArray(CAT_CAT16_data);\n    \}\n    else if (catDataSelection == 1)\n    \{\n        CAT_CAT16.setArray(Modified_CAT16_data);\n    \}\n    else if (catDataSelection == 2)\n    \{\n      CAT_CAT16 = RGBPrimsToXYZMatrix(rxy,gxy,bxy,wxy,1.0f,1);\n    \}\n\n\n  \}\n\n\n  void process()\n  \{\n    SampleType(src) source = src();\n    float3 srcRGB(source.x, source.y, source.z);\n    float3 dstRGB;\n    float3 diagnostic;\n\n    // diagnostic =  srcRGB;\n\n    // float3 surround(1.0f, 0.69f, 1.0f);\n    // float3 XYZ_w(95.05f, 100.00f, 108.88f);\n\n    float3 surround = viewingConditionsToSurround(viewingConditions);\n\n    if (direction == 0)\n    \{\n        float3 JMh = XYZ_to_Hellwig2022_JMh(srcRGB, XYZ_w, L_A, Y_b,surround,discount_illuminant);\n        dstRGB = JMh;\n    \}\n    else if (direction == 1)\n    \{\n        float3 XYZ_out = Hellwig2022_JMh_to_XYZ(srcRGB, XYZ_w, L_A, Y_b, surround, discount_illuminant);\n        dstRGB = XYZ_out;\n    \}\n    else if (direction == 2)\n    \{\n\n      dstRGB = srcRGB;\n    \}\n    else if (direction == 3)\n    \{\n        float3 compressed = post_adaptation_non_linear_response_compression_forward(srcRGB,L_A);\n        float3 uncompressed = post_adaptation_non_linear_response_compression_inverse(compressed,L_A);\n        dstRGB = uncompressed;\n    \}\n    else if (direction == 4)\n    \{\n        float3 JMh =     XYZ_to_Hellwig2022_JMh(srcRGB, XYZ_w, L_A, Y_b, surround, discount_illuminant);\n        float3 XYZ_out = Hellwig2022_JMh_to_XYZ(JMh   , XYZ_w, L_A, Y_b, surround, discount_illuminant);\n        dstRGB = XYZ_out;\n    \}\n    else if (direction == 5)\n    \{ \n      float angle = hue_angle_dependency_Hellwig2022(srcRGB.x);\n      dstRGB = float3(angle,angle,angle);\n    \}\n    else if (direction == 6)\n    \{\n      dstRGB = compress(srcRGB);\n    \}\n    else if (direction == 7)\n    \{\n      dstRGB = uncompress(srcRGB);\n    \}\n    else if (direction == 8)\n    \{\n      dstRGB = uncompress(compress(srcRGB));\n    \}\n    else if (direction == 9)\n    \{\n      dstRGB = viewingConditionsToSurround(viewingConditions);\n    \}\n\n\n    diagnostic = dstRGB;\n\n\n    dst() = float4(diagnostic.x, diagnostic.y, diagnostic.z, source.w ); \n  \}\n\};\n"
+  rebuild ""
+  hellwig2022_direction {{parent.BlinkScript22_hellwig2022_direction}}
+  hellwig2022_catDataSelection {{parent.BlinkScript22_hellwig2022_catDataSelection}}
+  hellwig2022_XYZ_w {{parent.BlinkScript22_hellwig2022_XYZ_w.x} {parent.BlinkScript22_hellwig2022_XYZ_w.y} {parent.BlinkScript22_hellwig2022_XYZ_w.z}}
+  hellwig2022_XYZ_w_scaler {{parent.BlinkScript22_hellwig2022_XYZ_w_scaler}}
+  hellwig2022_L_A {{parent.BlinkScript22_hellwig2022_L_A}}
+  hellwig2022_Y_b {{parent.BlinkScript22_hellwig2022_Y_b}}
+  hellwig2022_L_B {{parent.BlinkScript22_hellwig2022_L_B.x} {parent.BlinkScript22_hellwig2022_L_B.y} {parent.BlinkScript22_hellwig2022_L_B.z}}
+  hellwig2022_userSurround {{parent.BlinkScript22_hellwig2022_userSurround.x} {parent.BlinkScript22_hellwig2022_userSurround.y} {parent.BlinkScript22_hellwig2022_userSurround.z}}
+  hellwig2022_discount_illuminant {{parent.BlinkScript22_hellwig2022_discount_illuminant}}
+  hellwig2022_HK_mode {{parent.BlinkScript22_hellwig2022_HK_mode}}
+  hellwig2022_linear_extension {{parent.BlinkScript22_hellwig2022_linear_extension}}
+  hellwig2022_compressMode {{parent.BlinkScript22_hellwig2022_compressMode}}
+  hellwig2022_viewingConditions {{parent.BlinkScript22_hellwig2022_viewingConditions}}
+  rebuild_finalise ""
+  name BlinkScript22
+  xpos 1126
+  ypos 334
+ }
+ Shuffle {
+  name Shuffle35
+  label "\[value in]-->\[value out]"
+  note_font "Bitstream Vera Sans"
+  xpos 1126
+  ypos 366
+ }
+ Multiply {
+  value {1 1 {PI/360*2} 1}
+  name Multiply32
+  note_font "Bitstream Vera Sans"
+  xpos 1126
+  ypos 402
+ }
+ Expression {
+  expr0 sin(b)*g
+  expr1 r
+  expr2 cos(b)*g
+  expr3 1
+  name Expression34
+  note_font "Bitstream Vera Sans"
+  xpos 1126
+  ypos 438
+ }
+ Shuffle2 {
+  fromInput1 {{0} B}
+  fromInput2 {{0} B}
+  mappings "4 rgba.blue 0 2 rgba.blue 0 2 rgba.alpha 0 3 rgba.alpha 0 3 rgba.red 0 0 rgba.green 0 1 rgba.green 0 1 rgba.red 0 0"
+  name Shuffle36
+  xpos 1126
+  ypos 462
+ }
+push $N481d1c00
+ BlinkScript {
+  inputs 2
+  KernelDescription "2 \"PlotChromaticity\" iterate pixelWise 3e86399c7642fe5c35c23528a644f88a8bf13f967de084ae6842f8be55098c6b 3 \"col\" Read Random \"Yxy\" Read Random \"dst\" Write Random 4 \"padding\" Float 1 AAAAAA== \"left_margin\" Float 1 AAAAAA== \"tolerance\" Float 1 AAAAAA== \"antialias\" Bool 1 AA== 4 \"padding\" 1 1 \"left_margin\" 1 1 \"tolerance\" 1 1 \"antialias\" 1 1 2 \"outsize\" Float 1 1 AAAAAA== \"offset\" Float 1 1 AAAAAA=="
+  kernelSource "kernel PlotChromaticity : public ImageComputationKernel<ePixelWise>\n\{\n  Image<eRead, eAccessRandom, eEdgeClamped> col;\n  Image<eRead, eAccessRandom, eEdgeClamped> Yxy;\n  Image<eWrite, eAccessRandom> dst;\n\nparam:\n  float padding;\n  float left_margin;\n  float tolerance;\n  bool antialias;\n\nlocal:\n  float outsize;\n  float offset;\n\n  void init() \{\n    // calculate output width and height and offset based on padding\n    outsize = float(dst.bounds.height()/padding);\n    // xy offset for margin on lower left corner\n    offset = dst.bounds.height()*left_margin;\n  \}\n\n  float gaussian(float d, float a, float expv) \{\n    return max(0.0f, exp(-a*d*d)-expv);\n  \}\n\n  float gaussian_filter(float x, float y, float r) \{\n    // return gaussian weighted distance from origin (0, 0)\n    // given coordinate (x, y) and radius r\n    float a = 1.5f; // rate falloff\n    float expv = exp(-a*r*r);\n    return gaussian(x, a, expv) * gaussian(y, a, expv);\n  \}\n\n  void write_aa(float x, float y, float4 rgb) \{\n    // skip black pixels\n    if (rgb.x == 0.0f && rgb.y == 0.0f && rgb.z == 0.0f) return;\n    \n    // size of pixel neighborhood = n*2+1 by n*2+1\n    int n = 2;\n\n    // center of neighborhood\n    int u0 = round(x);\n    int v0 = round(y);\n\n    // skip if center pixel weight is greater than tolerance\n    if ( dst.bounds.inside(u0, v0)) \{\n      if (dst(u0, v0, 3) >= tolerance) return;\n    \}\n\n    // loop over neighborhood\n    for (int j = -n; j <= n; j++) \{\n      int v = v0 + j;\n      for (int i = -n; i <= n; i++) \{\n        int u = u0 + i;\n        if ( dst.bounds.inside(u, v)) \{\n          // get filter weight for coord (u,v)\n          float w = gaussian_filter(u-x, v-y, float(n));\n          float4 c0 = dst(u, v); // existing color\n\n          // merge current color sample over existing color sample\n          for (int k=0; k<3; k++) \{\n            dst(u, v, k) = rgb\[k]*w+c0\[k]*(1-w); \n          \}\n\n          // merge current weight over existing weight\n          float w0 = dst(u, v, 3);\n          dst(u, v, 3) = w+w0*(1-w);\n        \}\n      \}\n    \}\n  \}\n\n\n  void process(int2 pos) \{\n    float4 rgba = col(pos.x, pos.y);\n    \n    // Get CIE xy position from Yxy input for current pixel\n    float2 xy = float2(Yxy(pos.x, pos.y, 1), Yxy(pos.x, pos.y, 2));\n    \n    // Find output pixel coordinate for this CIE xy pixel value\n    float2 out_coord = float2(xy.x * outsize + offset, xy.y * outsize + offset);\n\n    // For each RGB component, write value from color input to output coordinate\n    if (antialias) \{\n      write_aa(out_coord.x, out_coord.y, rgba);\n    \} else \{\n      // For each RGB component, write value from color input to output coordinate\n      int2 p = int2(round(out_coord.x), round(out_coord.y));\n      if (dst.bounds.inside(p.x, p.y)) \{\n        for (int k=0; k<3; k++) \{\n          dst(p.x, p.y, k) = col(pos.x, pos.y, k);\n        \}\n        dst(p.x, p.y, 3) = 1.0f;\n      \}\n    \}\n  \}\n\};"
+  rebuild ""
+  PlotChromaticity_padding {{parent.edgeZoom}}
+  PlotChromaticity_left_margin 0.5
+  PlotChromaticity_tolerance 2
+  PlotChromaticity_antialias true
+  format "2048 2048 0 0 2048 2048 1 square_2K"
+  specifiedFormat true
+  rebuild_finalise ""
+  name PlotChromaticities8
+  xpos 1053
+  ypos 547
+  disable {{!parent.plot_input}}
+ }
+ Constant {
+  inputs 0
+  channels rgb
+  format "1024 1024 0 0 1024 1024 1 square_1K"
+  name Constant14
+  xpos 1376
+  ypos 157
+ }
+ Reformat {
+  type "to box"
+  box_width 101
+  box_height 37
+  box_fixed true
+  name Reformat21
+  xpos 1376
+  ypos 229
+ }
+ Expression {
+  expr0 100
+  expr1 (x/(width-1))*100
+  expr2 (y/(height-1))*360
+  name Expression29
+  xpos 1376
+  ypos 253
+ }
+ Expression {
+  expr2 angle
+  name Expression30
+  label "angle \[value angle]"
+  xpos 1376
+  ypos 277
+  disable true
+  addUserKnob {20 User}
+  addUserKnob {7 angle R 0 360}
+ }
+ Crop {
+  box {0 0 {width} {height-1}}
+  name Crop10
+  xpos 1376
+  ypos 314
+ }
+ Shuffle {
+  name Shuffle31
+  label "\[value in]-->\[value out]"
+  note_font "Bitstream Vera Sans"
+  xpos 1376
+  ypos 338
+ }
+ Grade {
+  multiply {1 0.5 1 1}
+  black_clamp false
+  name Grade9
+  xpos 1376
+  ypos 374
+ }
+ Multiply {
+  value {1 1 {PI/360*2} 1}
+  name Multiply30
+  note_font "Bitstream Vera Sans"
+  xpos 1376
+  ypos 413
+ }
+ Expression {
+  expr0 sin(b)*g
+  expr1 r
+  expr2 cos(b)*g
+  expr3 1
+  name Expression31
+  note_font "Bitstream Vera Sans"
+  xpos 1376
+  ypos 452
+ }
+ Shuffle2 {
+  fromInput1 {{0} B}
+  fromInput2 {{0} B}
+  mappings "4 rgba.blue 0 2 rgba.blue 0 2 rgba.alpha 0 3 rgba.alpha 0 3 rgba.red 0 0 rgba.green 0 1 rgba.green 0 1 rgba.red 0 0"
+  name Shuffle32
+  xpos 1376
+  ypos 476
+ }
+set N4814d000 [stack 0]
+ Constant {
+  inputs 0
+  channels rgb
+  color 1
+  format "1024 1024 0 0 1024 1024 1 square_1K"
+  name Constant15
+  xpos 1269
+  ypos 162
+ }
+set N4814cc00 [stack 0]
+ BlinkScript {
+  inputs 2
+  KernelDescription "2 \"PlotChromaticity\" iterate pixelWise 3e86399c7642fe5c35c23528a644f88a8bf13f967de084ae6842f8be55098c6b 3 \"col\" Read Random \"Yxy\" Read Random \"dst\" Write Random 4 \"padding\" Float 1 AAAAAA== \"left_margin\" Float 1 AAAAAA== \"tolerance\" Float 1 AAAAAA== \"antialias\" Bool 1 AA== 4 \"padding\" 1 1 \"left_margin\" 1 1 \"tolerance\" 1 1 \"antialias\" 1 1 2 \"outsize\" Float 1 1 AAAAAA== \"offset\" Float 1 1 AAAAAA=="
+  kernelSource "kernel PlotChromaticity : public ImageComputationKernel<ePixelWise>\n\{\n  Image<eRead, eAccessRandom, eEdgeClamped> col;\n  Image<eRead, eAccessRandom, eEdgeClamped> Yxy;\n  Image<eWrite, eAccessRandom> dst;\n\nparam:\n  float padding;\n  float left_margin;\n  float tolerance;\n  bool antialias;\n\nlocal:\n  float outsize;\n  float offset;\n\n  void init() \{\n    // calculate output width and height and offset based on padding\n    outsize = float(dst.bounds.height()/padding);\n    // xy offset for margin on lower left corner\n    offset = dst.bounds.height()*left_margin;\n  \}\n\n  float gaussian(float d, float a, float expv) \{\n    return max(0.0f, exp(-a*d*d)-expv);\n  \}\n\n  float gaussian_filter(float x, float y, float r) \{\n    // return gaussian weighted distance from origin (0, 0)\n    // given coordinate (x, y) and radius r\n    float a = 1.5f; // rate falloff\n    float expv = exp(-a*r*r);\n    return gaussian(x, a, expv) * gaussian(y, a, expv);\n  \}\n\n  void write_aa(float x, float y, float4 rgb) \{\n    // skip black pixels\n    if (rgb.x == 0.0f && rgb.y == 0.0f && rgb.z == 0.0f) return;\n    \n    // size of pixel neighborhood = n*2+1 by n*2+1\n    int n = 2;\n\n    // center of neighborhood\n    int u0 = round(x);\n    int v0 = round(y);\n\n    // skip if center pixel weight is greater than tolerance\n    if ( dst.bounds.inside(u0, v0)) \{\n      if (dst(u0, v0, 3) >= tolerance) return;\n    \}\n\n    // loop over neighborhood\n    for (int j = -n; j <= n; j++) \{\n      int v = v0 + j;\n      for (int i = -n; i <= n; i++) \{\n        int u = u0 + i;\n        if ( dst.bounds.inside(u, v)) \{\n          // get filter weight for coord (u,v)\n          float w = gaussian_filter(u-x, v-y, float(n));\n          float4 c0 = dst(u, v); // existing color\n\n          // merge current color sample over existing color sample\n          for (int k=0; k<3; k++) \{\n            dst(u, v, k) = rgb\[k]*w+c0\[k]*(1-w); \n          \}\n\n          // merge current weight over existing weight\n          float w0 = dst(u, v, 3);\n          dst(u, v, 3) = w+w0*(1-w);\n        \}\n      \}\n    \}\n  \}\n\n\n  void process(int2 pos) \{\n    float4 rgba = col(pos.x, pos.y);\n    \n    // Get CIE xy position from Yxy input for current pixel\n    float2 xy = float2(Yxy(pos.x, pos.y, 1), Yxy(pos.x, pos.y, 2));\n    \n    // Find output pixel coordinate for this CIE xy pixel value\n    float2 out_coord = float2(xy.x * outsize + offset, xy.y * outsize + offset);\n\n    // For each RGB component, write value from color input to output coordinate\n    if (antialias) \{\n      write_aa(out_coord.x, out_coord.y, rgba);\n    \} else \{\n      // For each RGB component, write value from color input to output coordinate\n      int2 p = int2(round(out_coord.x), round(out_coord.y));\n      if (dst.bounds.inside(p.x, p.y)) \{\n        for (int k=0; k<3; k++) \{\n          dst(p.x, p.y, k) = col(pos.x, pos.y, k);\n        \}\n        dst(p.x, p.y, 3) = 1.0f;\n      \}\n    \}\n  \}\n\};"
+  rebuild ""
+  PlotChromaticity_padding {{parent.PlotChromaticities8.PlotChromaticity_padding}}
+  PlotChromaticity_left_margin {{parent.PlotChromaticities8.PlotChromaticity_left_margin}}
+  PlotChromaticity_tolerance {{parent.PlotChromaticities8.PlotChromaticity_tolerance}}
+  PlotChromaticity_antialias true
+  format {{{parent.PlotChromaticities8.format}}}
+  specifiedFormat true
+  rebuild_finalise ""
+  name PlotChromaticities6
+  xpos 1269
+  ypos 552
+  disable {{!parent.plot_input}}
+ }
+ Constant {
+  inputs 0
+  channels rgb
+  format "1024 1024 0 0 1024 1024 1 square_1K"
+  name Constant16
+  xpos 1516
+  ypos 160
+ }
+ Reformat {
+  type "to box"
+  box_width 11
+  box_height 361
+  box_fixed true
+  resize distort
+  name Reformat22
+  xpos 1516
+  ypos 232
+ }
+ Expression {
+  expr0 100
+  expr1 (x/(width-1))*100
+  expr2 (y/(height-1))*360
+  name Expression32
+  xpos 1516
+  ypos 264
+ }
+ Crop {
+  box {0 0 {width} {height-1}}
+  name Crop11
+  xpos 1516
+  ypos 288
+ }
+ Shuffle {
+  name Shuffle33
+  label "\[value in]-->\[value out]"
+  note_font "Bitstream Vera Sans"
+  xpos 1516
+  ypos 312
+ }
+ Grade {
+  multiply {1 0.5 1 1}
+  black_clamp false
+  name Grade10
+  xpos 1516
+  ypos 348
+ }
+ Multiply {
+  value {1 1 {PI/360*2} 1}
+  name Multiply31
+  note_font "Bitstream Vera Sans"
+  xpos 1516
+  ypos 392
+ }
+ Expression {
+  expr0 sin(b)*g
+  expr1 r
+  expr2 cos(b)*g
+  expr3 1
+  name Expression33
+  note_font "Bitstream Vera Sans"
+  xpos 1516
+  ypos 435
+ }
+ Shuffle2 {
+  fromInput1 {{0} B}
+  fromInput2 {{0} B}
+  mappings "4 rgba.blue 0 2 rgba.blue 0 2 rgba.alpha 0 3 rgba.alpha 0 3 rgba.red 0 0 rgba.green 0 1 rgba.green 0 1 rgba.red 0 0"
+  name Shuffle34
+  xpos 1516
+  ypos 470
+ }
+push $N4814cc00
+ BlinkScript {
+  inputs 2
+  KernelDescription "2 \"PlotChromaticity\" iterate pixelWise 3e86399c7642fe5c35c23528a644f88a8bf13f967de084ae6842f8be55098c6b 3 \"col\" Read Random \"Yxy\" Read Random \"dst\" Write Random 4 \"padding\" Float 1 AAAAAA== \"left_margin\" Float 1 AAAAAA== \"tolerance\" Float 1 AAAAAA== \"antialias\" Bool 1 AA== 4 \"padding\" 1 1 \"left_margin\" 1 1 \"tolerance\" 1 1 \"antialias\" 1 1 2 \"outsize\" Float 1 1 AAAAAA== \"offset\" Float 1 1 AAAAAA=="
+  kernelSource "kernel PlotChromaticity : public ImageComputationKernel<ePixelWise>\n\{\n  Image<eRead, eAccessRandom, eEdgeClamped> col;\n  Image<eRead, eAccessRandom, eEdgeClamped> Yxy;\n  Image<eWrite, eAccessRandom> dst;\n\nparam:\n  float padding;\n  float left_margin;\n  float tolerance;\n  bool antialias;\n\nlocal:\n  float outsize;\n  float offset;\n\n  void init() \{\n    // calculate output width and height and offset based on padding\n    outsize = float(dst.bounds.height()/padding);\n    // xy offset for margin on lower left corner\n    offset = dst.bounds.height()*left_margin;\n  \}\n\n  float gaussian(float d, float a, float expv) \{\n    return max(0.0f, exp(-a*d*d)-expv);\n  \}\n\n  float gaussian_filter(float x, float y, float r) \{\n    // return gaussian weighted distance from origin (0, 0)\n    // given coordinate (x, y) and radius r\n    float a = 1.5f; // rate falloff\n    float expv = exp(-a*r*r);\n    return gaussian(x, a, expv) * gaussian(y, a, expv);\n  \}\n\n  void write_aa(float x, float y, float4 rgb) \{\n    // skip black pixels\n    if (rgb.x == 0.0f && rgb.y == 0.0f && rgb.z == 0.0f) return;\n    \n    // size of pixel neighborhood = n*2+1 by n*2+1\n    int n = 2;\n\n    // center of neighborhood\n    int u0 = round(x);\n    int v0 = round(y);\n\n    // skip if center pixel weight is greater than tolerance\n    if ( dst.bounds.inside(u0, v0)) \{\n      if (dst(u0, v0, 3) >= tolerance) return;\n    \}\n\n    // loop over neighborhood\n    for (int j = -n; j <= n; j++) \{\n      int v = v0 + j;\n      for (int i = -n; i <= n; i++) \{\n        int u = u0 + i;\n        if ( dst.bounds.inside(u, v)) \{\n          // get filter weight for coord (u,v)\n          float w = gaussian_filter(u-x, v-y, float(n));\n          float4 c0 = dst(u, v); // existing color\n\n          // merge current color sample over existing color sample\n          for (int k=0; k<3; k++) \{\n            dst(u, v, k) = rgb\[k]*w+c0\[k]*(1-w); \n          \}\n\n          // merge current weight over existing weight\n          float w0 = dst(u, v, 3);\n          dst(u, v, 3) = w+w0*(1-w);\n        \}\n      \}\n    \}\n  \}\n\n\n  void process(int2 pos) \{\n    float4 rgba = col(pos.x, pos.y);\n    \n    // Get CIE xy position from Yxy input for current pixel\n    float2 xy = float2(Yxy(pos.x, pos.y, 1), Yxy(pos.x, pos.y, 2));\n    \n    // Find output pixel coordinate for this CIE xy pixel value\n    float2 out_coord = float2(xy.x * outsize + offset, xy.y * outsize + offset);\n\n    // For each RGB component, write value from color input to output coordinate\n    if (antialias) \{\n      write_aa(out_coord.x, out_coord.y, rgba);\n    \} else \{\n      // For each RGB component, write value from color input to output coordinate\n      int2 p = int2(round(out_coord.x), round(out_coord.y));\n      if (dst.bounds.inside(p.x, p.y)) \{\n        for (int k=0; k<3; k++) \{\n          dst(p.x, p.y, k) = col(pos.x, pos.y, k);\n        \}\n        dst(p.x, p.y, 3) = 1.0f;\n      \}\n    \}\n  \}\n\};"
+  rebuild ""
+  PlotChromaticity_padding {{parent.PlotChromaticities8.PlotChromaticity_padding}}
+  PlotChromaticity_left_margin {{parent.PlotChromaticities8.PlotChromaticity_left_margin}}
+  PlotChromaticity_tolerance {{parent.PlotChromaticities8.PlotChromaticity_tolerance}}
+  PlotChromaticity_antialias true
+  format {{{parent.PlotChromaticities8.format}}}
+  specifiedFormat true
+  rebuild_finalise ""
+  name PlotChromaticities1
+  xpos 1435
+  ypos 541
+  disable {{!parent.plot_input}}
+ }
+ Merge2 {
+  inputs 2
+  operation plus
+  name Plus4
+  xpos 1269
+  ypos 594
+ }
+set N480e9400 [stack 0]
+ Text {
+  message "100\n90\n80\n70\n60\n50\n40\n30\n20\n10\n"
+  font "/Library/Fonts/Arial Unicode.ttf"
+  size {{parent.fontSize}}
+  leading {{1/(size/(((box.t-box.y)-(size*10))/10))}}
+  yjustify top
+  Transform 1
+  box {{width/2} {input.height/2} {width} {(height/2)+((height/2)*(1/(parent.PlotChromaticities8.PlotChromaticity_padding/100)))}}
+  center {1024 1024}
+  name Text6
+  selected true
+  xpos 1269
+  ypos 632
+ }
+ Text {
+  message "h: 0  M:"
+  font "/Library/Fonts/Arial Unicode.ttf"
+  size {{parent.Text6.size}}
+  xjustify right
+  yjustify top
+  Transform 1
+  box {0 0 {width/2} {height}}
+  center {1024 1024}
+  name Text7
+  xpos 1269
+  ypos 664
+ }
+ Text {
+  message "h: 90"
+  font "/Library/Fonts/Arial Unicode.ttf"
+  size {{parent.Text6.size}}
+  xjustify right
+  yjustify center
+  Transform 1
+  box {0 0 {width} {height}}
+  center {1024 1024}
+  name Text8
+  xpos 1269
+  ypos 696
+ }
+ Text {
+  message "h: 180"
+  font "/Library/Fonts/Arial Unicode.ttf"
+  size {{parent.Text6.size}}
+  xjustify center
+  yjustify bottom
+  Transform 1
+  box {0 0 {width} {height}}
+  center {1024 1024}
+  name Text9
+  xpos 1269
+  ypos 720
+ }
+ Text {
+  message "h: 270"
+  font "/Library/Fonts/Arial Unicode.ttf"
+  size {{parent.Text6.size}}
+  yjustify center
+  Transform 1
+  box {0 0 {width} {height}}
+  center {1024 1024}
+  name Text10
+  xpos 1269
+  ypos 746
+ }
+ Grade {
+  multiply 0.5
+  name Grade11
+  xpos 1269
+  ypos 770
+ }
+ Merge2 {
+  inputs 2
+  operation plus
+  name Plus5
+  xpos 1053
+  ypos 836
+ }
+ Output {
+  name Output1
+  xpos 1053
+  ypos 936
+ }
+ Reformat {
+  inputs 0
+  type "to box"
+  box_width 1000
+  box_height {{box_width}}
+  box_fixed true
+  name Reformat1
+  xpos 1452
+  ypos 605
+ }
+push $N4814d000
+push $N480e9400
+ Viewer {
+  inputs 2
+  frame 86
+  frame_range 1-100
+  colour_sample_bbox {-0.5799999833 -0.3700000048 -0.5600000024 -0.349999994}
+  gl_buffer_depth half-float
+  viewerProcess "sRGB (ACES)"
+  name Viewer1
+  xpos 1516
+  ypos 494
+ }
+end_group
