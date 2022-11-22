@@ -2966,6 +2966,11 @@ float3 uncompress(float3 xyz)
         dstRGB = JMh;
         diagnostic =  dstRGB;
       }
+      else if ( diagnosticMode == 8)
+      {
+        dstRGB = JMh_to_output_RGB(srcRGB);
+        diagnostic =  dstRGB;
+      }
     }
 
     dst() = float4(diagnostic.x, diagnostic.y, diagnostic.z, source.w ); 
