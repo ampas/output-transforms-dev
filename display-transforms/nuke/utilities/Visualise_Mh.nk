@@ -2,20 +2,21 @@ set cut_paste_input [stack 0]
 version 13.0 v3
 push $cut_paste_input
 Group {
- name Visualise_Mh
+ name Visualise_Mh4
  tile_color 0xa331e0ff
  note_font "Verdana Bold Italic"
  note_font_color 0xb938ffff
  selected true
- xpos 1064
- ypos 2285
+ xpos 1232
+ ypos 2405
  addUserKnob {20 User}
- addUserKnob {26 notes l "" +STARTLINE T "Assumes XYZ input"}
- addUserKnob {26 "" +STARTLINE}
+ addUserKnob {26 ""}
+ addUserKnob {4 inputMode l "Input Mode" M {XYZ JMh}}
+ addUserKnob {26 ""}
  addUserKnob {3 BlinkScript22_hellwig2022_direction l direction}
  addUserKnob {3 BlinkScript22_hellwig2022_catDataSelection l catDataSelection}
  addUserKnob {13 BlinkScript22_hellwig2022_XYZ_w l XYZ_w}
- BlinkScript22_hellwig2022_XYZ_w {95.05 100 108.88}
+ BlinkScript22_hellwig2022_XYZ_w {95.263702 100 100.883436}
  addUserKnob {8 BlinkScript22_hellwig2022_XYZ_w_scaler l XYZ_w_scaler}
  BlinkScript22_hellwig2022_XYZ_w_scaler 1
  addUserKnob {8 BlinkScript22_hellwig2022_L_A l L_A}
@@ -26,19 +27,20 @@ Group {
  addUserKnob {13 BlinkScript22_hellwig2022_userSurround l userSurround}
  BlinkScript22_hellwig2022_userSurround {1 0.69 1}
  addUserKnob {6 BlinkScript22_hellwig2022_discount_illuminant l discount_illuminant +STARTLINE}
+ BlinkScript22_hellwig2022_discount_illuminant true
  addUserKnob {6 BlinkScript22_hellwig2022_HK_mode l HK_mode -STARTLINE}
- BlinkScript22_hellwig2022_HK_mode true
  addUserKnob {6 BlinkScript22_hellwig2022_linear_extension l linear_extension -STARTLINE}
  addUserKnob {6 BlinkScript22_hellwig2022_compressMode l compressMode -STARTLINE}
- BlinkScript22_hellwig2022_compressMode true
- addUserKnob {4 BlinkScript22_hellwig2022_viewingConditions l viewingCondition M {Dark Dim Average ""}}
+ addUserKnob {4 BlinkScript22_hellwig2022_viewingConditions l viewingCondition M {Dark Dim Average User ""}}
  BlinkScript22_hellwig2022_viewingConditions Average
- addUserKnob {26 "" +STARTLINE}
+ addUserKnob {26 ""}
  addUserKnob {41 format T PlotChromaticities8.format}
  addUserKnob {7 edgeZoom R 0 200}
- edgeZoom 40
+ edgeZoom 100
  addUserKnob {3 fontSize}
- fontSize 40
+ fontSize 30
+ addUserKnob {26 ""}
+ addUserKnob {4 outputMode l "Output Mode" M {plot JMh}}
 }
  Input {
   inputs 0
@@ -46,12 +48,13 @@ Group {
   xpos 1053
   ypos 171
  }
+set N73e3b800 [stack 0]
  Dot {
   name Dot13
   xpos 1087
   ypos 283
  }
-set N481d1c00 [stack 0]
+set N73e3b400 [stack 0]
  BlinkScript {
   kernelSourceFile /Users/afry/GitHub/nukeHellwig2022/hellwig2022_mods.blink
   recompileCount 271
@@ -74,22 +77,33 @@ set N481d1c00 [stack 0]
   hellwig2022_viewingConditions {{parent.BlinkScript22_hellwig2022_viewingConditions}}
   rebuild_finalise ""
   name BlinkScript22
+  xpos 1202
+  ypos 327
+ }
+set N73e3b000 [stack 0]
+push $N73e3b800
+push $N73e3b000
+ Switch {
+  inputs 2
+  which {{parent.inputMode}}
+  name Switch2
+  selected true
   xpos 1126
-  ypos 334
+  ypos 369
  }
  Shuffle {
   name Shuffle35
   label "\[value in]-->\[value out]"
   note_font "Bitstream Vera Sans"
   xpos 1126
-  ypos 366
+  ypos 397
  }
  Multiply {
   value {1 1 {PI/360*2} 1}
   name Multiply32
   note_font "Bitstream Vera Sans"
   xpos 1126
-  ypos 402
+  ypos 433
  }
  Expression {
   expr0 sin(b)*g
@@ -99,7 +113,7 @@ set N481d1c00 [stack 0]
   name Expression34
   note_font "Bitstream Vera Sans"
   xpos 1126
-  ypos 438
+  ypos 464
  }
  Shuffle2 {
   fromInput1 {{0} B}
@@ -107,9 +121,9 @@ set N481d1c00 [stack 0]
   mappings "4 rgba.blue 0 2 rgba.blue 0 2 rgba.alpha 0 3 rgba.alpha 0 3 rgba.red 0 0 rgba.green 0 1 rgba.green 0 1 rgba.red 0 0"
   name Shuffle36
   xpos 1126
-  ypos 462
+  ypos 495
  }
-push $N481d1c00
+push $N73e3b400
  BlinkScript {
   inputs 2
   KernelDescription "2 \"PlotChromaticity\" iterate pixelWise 3e86399c7642fe5c35c23528a644f88a8bf13f967de084ae6842f8be55098c6b 3 \"col\" Read Random \"Yxy\" Read Random \"dst\" Write Random 4 \"padding\" Float 1 AAAAAA== \"left_margin\" Float 1 AAAAAA== \"tolerance\" Float 1 AAAAAA== \"antialias\" Bool 1 AA== 4 \"padding\" 1 1 \"left_margin\" 1 1 \"tolerance\" 1 1 \"antialias\" 1 1 2 \"outsize\" Float 1 1 AAAAAA== \"offset\" Float 1 1 AAAAAA=="
@@ -119,7 +133,7 @@ push $N481d1c00
   PlotChromaticity_left_margin 0.5
   PlotChromaticity_tolerance 2
   PlotChromaticity_antialias true
-  format "2048 2048 0 0 2048 2048 1 square_2K"
+  format "1024 1024 0 0 1024 1024 1 square_1K"
   specifiedFormat true
   rebuild_finalise ""
   name PlotChromaticities8
@@ -207,7 +221,7 @@ push $N481d1c00
   xpos 1376
   ypos 476
  }
-set N4814d000 [stack 0]
+set N741c6c00 [stack 0]
  Constant {
   inputs 0
   channels rgb
@@ -217,7 +231,7 @@ set N4814d000 [stack 0]
   xpos 1269
   ypos 162
  }
-set N4814cc00 [stack 0]
+set N741c6800 [stack 0]
  BlinkScript {
   inputs 2
   KernelDescription "2 \"PlotChromaticity\" iterate pixelWise 3e86399c7642fe5c35c23528a644f88a8bf13f967de084ae6842f8be55098c6b 3 \"col\" Read Random \"Yxy\" Read Random \"dst\" Write Random 4 \"padding\" Float 1 AAAAAA== \"left_margin\" Float 1 AAAAAA== \"tolerance\" Float 1 AAAAAA== \"antialias\" Bool 1 AA== 4 \"padding\" 1 1 \"left_margin\" 1 1 \"tolerance\" 1 1 \"antialias\" 1 1 2 \"outsize\" Float 1 1 AAAAAA== \"offset\" Float 1 1 AAAAAA=="
@@ -306,7 +320,7 @@ set N4814cc00 [stack 0]
   xpos 1516
   ypos 470
  }
-push $N4814cc00
+push $N741c6800
  BlinkScript {
   inputs 2
   KernelDescription "2 \"PlotChromaticity\" iterate pixelWise 3e86399c7642fe5c35c23528a644f88a8bf13f967de084ae6842f8be55098c6b 3 \"col\" Read Random \"Yxy\" Read Random \"dst\" Write Random 4 \"padding\" Float 1 AAAAAA== \"left_margin\" Float 1 AAAAAA== \"tolerance\" Float 1 AAAAAA== \"antialias\" Bool 1 AA== 4 \"padding\" 1 1 \"left_margin\" 1 1 \"tolerance\" 1 1 \"antialias\" 1 1 2 \"outsize\" Float 1 1 AAAAAA== \"offset\" Float 1 1 AAAAAA=="
@@ -331,7 +345,6 @@ push $N4814cc00
   xpos 1269
   ypos 594
  }
-set N480e9400 [stack 0]
  Text {
   message "100\n90\n80\n70\n60\n50\n40\n30\n20\n10\n"
   font "/Library/Fonts/Arial Unicode.ttf"
@@ -342,7 +355,6 @@ set N480e9400 [stack 0]
   box {{width/2} {input.height/2} {width} {(height/2)+((height/2)*(1/(parent.PlotChromaticities8.PlotChromaticity_padding/100)))}}
   center {1024 1024}
   name Text6
-  selected true
   xpos 1269
   ypos 632
  }
@@ -410,6 +422,13 @@ set N480e9400 [stack 0]
   xpos 1053
   ypos 836
  }
+ Switch {
+  inputs 2
+  which {{parent.outputMode}}
+  name Switch1
+  xpos 1053
+  ypos 884
+ }
  Output {
   name Output1
   xpos 1053
@@ -425,13 +444,12 @@ set N480e9400 [stack 0]
   xpos 1452
   ypos 605
  }
-push $N4814d000
-push $N480e9400
+push $N741c6c00
+push $N73e3b000
  Viewer {
   inputs 2
-  frame 86
   frame_range 1-100
-  colour_sample_bbox {-0.5799999833 -0.3700000048 -0.5600000024 -0.349999994}
+  colour_sample_bbox {0.13671875 0.07421875 0.138671875 0.076171875}
   gl_buffer_depth half-float
   viewerProcess "sRGB (ACES)"
   name Viewer1
