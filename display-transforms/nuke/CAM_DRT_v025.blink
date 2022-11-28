@@ -2908,66 +2908,65 @@ float3 uncompress(float3 xyz)
     float3 srcRGB(source.x, source.y, source.z);
     float3 dstRGB;
     float3 diagnostic;
+    float3 compressedJMh;
+    float3 tonemappedJMh;
+    float3 JMh;
 
     if( invert )
     {
-      float3 compressedJMh = output_RGB_to_JMh(srcRGB);
-      float3 uncompressedJMh = compressGamutInverse(compressedJMh);
-      float3 untonemappedJMh = inverseTonescale(uncompressedJMh);
-      dstRGB = JMh_to_input_RGB(untonemappedJMh);
+      compressedJMh = output_RGB_to_JMh(srcRGB);
+      tonemappedJMh = compressGamutInverse(compressedJMh);
+      JMh = inverseTonescale(tonemappedJMh);
+      dstRGB = JMh_to_input_RGB(JMh);
       diagnostic =  dstRGB;
     }
     else
     {
-      float3 JMh = input_RGB_to_JMh(srcRGB);
-      float3 tonemappedJMh = forwardTonescale(JMh, srcRGB);
-      float3 compressedJMh = compressGamutForward(tonemappedJMh);
+      JMh = input_RGB_to_JMh(srcRGB);
+      tonemappedJMh = forwardTonescale(JMh, srcRGB);
+      compressedJMh = compressGamutForward(tonemappedJMh);
       dstRGB = JMh_to_output_RGB(compressedJMh);
-      
-      if (diagnosticMode == 0)
-      {        
-        // normal path
-        diagnostic =  dstRGB;
-      }
-      else if ( diagnosticMode == 1 || diagnosticMode == 6 )
-      {
-        // Mode 6 actually returns XYZ, mode 1 returns real JMh
-        diagnostic =  JMh;
-      }
-      else if ( diagnosticMode == 2)
-      {
-        diagnostic =  tonemappedJMh;
-      }
-      else if ( diagnosticMode == 3 || diagnosticMode == 5 )
-      {
-        diagnostic =  compressedJMh;
-      }
-      else if ( diagnosticMode == 4 )
-      {
-        dstRGB = JMh_to_output_RGB(JMh);
-        diagnostic =  dstRGB;
-      }
-      else if ( diagnosticMode == 7)
-      {
-        dstRGB = JMh_to_output_RGB(srcRGB);
-        diagnostic =  dstRGB;
-      }
-      else if ( diagnosticMode == 8)
-      {
-        diagnostic =  inWhite;
-      }
-      else if ( diagnosticMode == 9)
-      {
-        diagnostic =  outWhite;
-      }
-      else if ( diagnosticMode == 10)
-      {
-        diagnostic =  limitWhite;
-      }
-      else if ( diagnosticMode == 11)
-      {
-        diagnostic =  d65White;
-      }
+      diagnostic =  dstRGB;
+    }
+
+    if ( diagnosticMode == 1 || diagnosticMode == 6 )
+    {
+      // Mode 6 actually returns XYZ, mode 1 returns real JMh
+      diagnostic =  JMh;
+    }
+    else if ( diagnosticMode == 2)
+    {
+      diagnostic =  tonemappedJMh;
+    }
+    else if ( diagnosticMode == 3 || diagnosticMode == 5 )
+    {
+      diagnostic =  compressedJMh;
+    }
+    else if ( diagnosticMode == 4 )
+    {
+      dstRGB = JMh_to_output_RGB(JMh);
+      diagnostic =  dstRGB;
+    }
+    else if ( diagnosticMode == 7)
+    {
+      dstRGB = JMh_to_output_RGB(srcRGB);
+      diagnostic =  dstRGB;
+    }
+    else if ( diagnosticMode == 8)
+    {
+      diagnostic =  inWhite;
+    }
+    else if ( diagnosticMode == 9)
+    {
+      diagnostic =  outWhite;
+    }
+    else if ( diagnosticMode == 10)
+    {
+      diagnostic =  limitWhite;
+    }
+    else if ( diagnosticMode == 11)
+    {
+      diagnostic =  d65White;
     }
 
     dst() = float4(diagnostic.x, diagnostic.y, diagnostic.z, source.w ); 
