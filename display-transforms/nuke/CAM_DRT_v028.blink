@@ -264,8 +264,8 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
   local:
 
     // constants
-    float HALF_MIN;
-    float HALF_MAX;
+    float HALF_MINIMUM;
+    float HALF_MAXIMUM;
 
     // Hellwig 2022 constants
     float3x3 CAT_CAT16;
@@ -1237,8 +1237,8 @@ float3 uncompress(float3 xyz)
   // convert RGB values in the input colorspace to the ZCAM intermediate Izazbz colorspace
   float3 input_RGB_to_Izazbz(float3 inputRGB)
   {
-    // clamp input to +/- HALF_MAX range (to remove inf values, etc.)
-    inputRGB = clamp3(inputRGB, -HALF_MAX, HALF_MAX);
+    // clamp input to +/- HALF_MAXIMUM range (to remove inf values, etc.)
+    inputRGB = clamp3(inputRGB, -HALF_MAXIMUM, HALF_MAXIMUM);
 
     // convert to linear XYZ luminance values
     float3 luminanceRGB = encodingToLuminance3( encodingIn, inputRGB);
@@ -2238,8 +2238,8 @@ float3 uncompress(float3 xyz)
 
   float3 input_RGB_to_JMh(float3 inputRGB)
   {
-    // clamp input to +/- HALF_MAX range (to remove inf values, etc.)
-    inputRGB = clamp3(inputRGB, -HALF_MAX, HALF_MAX);
+    // clamp input to +/- HALF_MAXIMUM range (to remove inf values, etc.)
+    inputRGB = clamp3(inputRGB, -HALF_MAXIMUM, HALF_MAXIMUM);
 
     // convert to linear XYZ luminance values
     float3 luminanceRGB = encodingToLuminance3( encodingIn, inputRGB);
@@ -2509,8 +2509,8 @@ float3 uncompress(float3 xyz)
 
   void init()
   {
-    HALF_MIN = 0.0000000596046448f;
-    HALF_MAX = 65504.0f;
+    HALF_MINIMUM = 0.0000000596046448f;
+    HALF_MAXIMUM = 65504.0f;
 
     zcam_L_A = referenceLuminance * backgroundLuminance / 100.0f;
     zcam_F_b = sqrt(backgroundLuminance/referenceLuminance);
