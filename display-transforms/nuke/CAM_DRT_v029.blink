@@ -2412,7 +2412,7 @@ float3 uncompress(float3 xyz)
     limitJmax = limit_RGB_to_JMh(float3(1.0f)).x;
 
     midJ = XYZ_to_JMh(refWhite * sstsLuminance.y, refWhite, d65White, outputViewingConditions, L_A_out, Y_b_out, discountIlluminant_mid, HK_mode_mid).x;
-    gamut_gamma = 1.0f / (viewingConditionsToSurround(outputViewingConditions).y * (1.48f + sqrtf(Y_b_out / L_A_out)));
+    gamut_gamma = 1.0f / (viewingConditionsToSurround(outputViewingConditions).y * (1.48f + sqrt(Y_b_out / L_A_out)));
   }
 
 
