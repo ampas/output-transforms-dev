@@ -82,7 +82,7 @@ Group {
  addUserKnob {6 applyChromaCompression +STARTLINE}
  applyChromaCompression true
  addUserKnob {7 chromaCompression R 0 1.5}
- chromaCompression 0.51
+ chromaCompression 1
  addUserKnob {7 saturation t "Global saturation" R 0 1.5}
  saturation 1
  addUserKnob {26 ""}
