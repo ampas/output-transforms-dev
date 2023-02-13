@@ -88,6 +88,7 @@ Group {
  addUserKnob {26 ""}
  addUserKnob {26 output_div l Output}
  addUserKnob {4 encoding_out l encoding t "the output log or gamma encoding" M {Linear ACEScct sRGB BT.1886 "Gamma 2.6" ST2084 ""}}
+ encoding_out BT.1886
  addUserKnob {4 primaries_out l primaries t "the output primaries and white point" -STARTLINE M {AP0-ACES AP1-ACES sRGB/Rec.709-D65 Rec.2020-D65 P3-D65 P3-DCI "" ""}}
  primaries_out sRGB/Rec.709-D65
  addUserKnob {4 viewing_conditions l "viewing conditions" t "the ZCAM viewing conditions" M {dark dim average ""}}
