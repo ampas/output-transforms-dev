@@ -3,11 +3,11 @@ version 14.0 v1
 push $cut_paste_input
 Group {
  name DRT_CAM
- label "Input: \[value encoding_in] / \[value primaries_in]\nLimit: \[value primaries_limit] / \[value ssts_luminance.2]nits\nOutput: \[value encoding_out] / \[value primaries_out]\n\[value toneScaleMode]\n\[if \{\[value DRT_CAM_Kernel_HK_mode_in]==true\} \{return HK\\ mode\\ in\}]"
+ label "Input: \[value encoding_in] / \[value primaries_in]\nLimit: \[value primaries_limit] / \[value ssts_luminance.2]nits\nOutput: \[value encoding_out] / \[value primaries_out]\n\[value toneScaleMode]\n\[file tail \[value BlinkScript1.kernelSourceFile]]"
  note_font "Bitstream Vera Sans"
  selected true
- xpos -240
- ypos -79
+ xpos -159
+ ypos 559
  addUserKnob {20 User}
  addUserKnob {26 input_div l Input}
  addUserKnob {4 encoding_in l encoding t "the input log or gamma encoding" M {Linear ACEScct sRGB BT.1886 "Gamma 2.6" ST2084 "" ""}}

@@ -2,12 +2,12 @@ set cut_paste_input [stack 0]
 version 14.0 v1
 push $cut_paste_input
 Group {
- name DRT_CAM
- label "Input: \[value encoding_in] / \[value primaries_in]\nLimit: \[value primaries_limit] / \[value ssts_luminance.2]nits\nOutput: \[value encoding_out] / \[value primaries_out]\n\[value toneScaleMode]\n\[if \{\[value DRT_CAM_Kernel_HK_mode_in]==true\} \{return HK\\ mode\\ in\}]"
+ name DRT_CAM1
+ label "Input: \[value encoding_in] / \[value primaries_in]\nLimit: \[value primaries_limit] / \[value ssts_luminance.2]nits\nOutput: \[value encoding_out] / \[value primaries_out]\n\[value toneScaleMode]\n\[file tail \[value BlinkScript1.kernelSourceFile]]"
  note_font "Bitstream Vera Sans"
  selected true
- xpos -240
- ypos -63
+ xpos -195
+ ypos 587
  addUserKnob {20 User}
  addUserKnob {26 input_div l Input}
  addUserKnob {4 encoding_in l encoding t "the input log or gamma encoding" M {Linear ACEScct sRGB BT.1886 "Gamma 2.6" ST2084 "" ""}}
@@ -182,6 +182,7 @@ Group {
   DRT_CAM_Kernel_clamp_thr 0.99
   DRT_CAM_Kernel_clamp_dist 1.1
   DRT_CAM_Kernel_invert {{parent.invert}}
+  DRT_CAM_Kernel_diagnosticMode 3
   DRT_CAM_Kernel_mmScaleFactor 100
   DRT_CAM_Kernel_daniele_n {{parent.ssts_luminance.z}}
   DRT_CAM_Kernel_daniele_n_r 100
