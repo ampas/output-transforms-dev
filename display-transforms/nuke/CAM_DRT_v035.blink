@@ -2111,8 +2111,15 @@ float3 uncompress_bjorn(float3 xyz)
     else if (diagnosticMode == 12)
     {
       // output gamut boundry
-      diagnostic = compressGamut(srcRGB, 0);
+      diagnostic = compressGamut(srcRGB, 1);
     }
+    else if (diagnosticMode == 13)
+    {
+      // output gamut boundry
+      diagnostic = compressGamut(srcRGB, invert);
+    }
+    
+    
 
     dst() = float4(diagnostic.x, diagnostic.y, diagnostic.z, source.w ); 
   }
