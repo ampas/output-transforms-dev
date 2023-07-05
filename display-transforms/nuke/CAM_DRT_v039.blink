@@ -68,7 +68,8 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
 
     // Toggle chroma compression
     bool applyChromaCompression;
-    bool simpleCompressMode;
+    bool applyInGamutCompression;
+    bool applySaturation;
 
     // Chroma compression params (limit, k1, k2)
     float3 chromaCParams;
@@ -1526,7 +1527,8 @@ float3 uncompress_bjorn(float3 xyz)
   // In-gamut chroma compression
   //
   // Compresses colors inside the gamut with the aim for colorfulness to have an
-  // appropriate rate of change from display black to display white.
+  // appropriate rate of change from display black to display white, and from
+  // achromatic outward to purer colors.
   //
   // Steps:
   //  - Scale down M by tonescaledJ / origJ
@@ -1547,33 +1549,33 @@ float3 uncompress_bjorn(float3 xyz)
     float Mcusp = cusp_with_eccentricity_factor(JMh.z);
     float sat_fact = sat_factor(nJ, noJ);
 
-    if (simpleCompressMode)
-    {
-      if (!invert)
-      {
-        M =  JMh.y * ( JMh.x / origJ);
-      }
-      else
-      {
-        M =  JMh.y * ( JMh.x / origJ);
-      }
-      return M;
-    }
-
     if (!invert)
     {
       M *= pow(nJ, nJ_exp) / noJ;
-      M /= Mcusp;
-      M = compress_range(M, chromaCParams.x, nJ * chromaCParams.y, max(1.0f - nJ, 0.01f) * chromaCParams.z, 0);
-      M *= Mcusp * sat_fact * scaleM;
+      if (applyInGamutCompression)
+      {
+        M /= Mcusp;
+        M = compress_range(M, chromaCParams.x, nJ * chromaCParams.y, max(1.0f - nJ, 0.01f) * chromaCParams.z, 0);
+        M *= Mcusp * scaleM;
+      }
+      if (applySaturation)
+      {
+        M *= sat_fact;
+      }
     }
     else
     {
-      M /= Mcusp * sat_fact * scaleM;
-      M = compress_range(M, chromaCParams.x, nJ * chromaCParams.y, max(1.0f - nJ, 0.01f) * chromaCParams.z, 1);
-      M *= Mcusp;
+      if (applySaturation)
+      {
+        M /= sat_fact;
+      }
+      if (applyInGamutCompression)
+      {
+        M /= Mcusp * scaleM;
+        M = compress_range(M, chromaCParams.x, nJ * chromaCParams.y, max(1.0f - nJ, 0.01f) * chromaCParams.z, 1);
+        M *= Mcusp;
+      }
       M = noJ * (M / pow(nJ, nJ_exp));
-      M = min(M,JMh.y);
     }
 
     return M;
