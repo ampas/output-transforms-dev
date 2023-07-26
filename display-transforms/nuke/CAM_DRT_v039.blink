@@ -121,6 +121,7 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
     bool AP1compressmode;
     bool Locuscompressmode;
     bool iterativeGamutCompressor;
+    int iterativeGamutCompressorIterations;
 
 
     // How much the edges of the target RGB cube are smoothed when finding the gamut boundary 
@@ -1951,7 +1952,7 @@ float3 uncompress_bjorn(float3 xyz)
 
     float startStepSize = lerp(JMcusp.y / 3.0f, 0.1f, cuspToTipRatio);
 
-    float2 JMboundary = findBoundary(JMinput, JMfocus,  inputJMh.z, refWhite, d65White, XYZ_to_RGB_limit, smoothCusps, 10, startStepSize);
+    float2 JMboundary = findBoundary(JMinput, JMfocus,  inputJMh.z, refWhite, d65White, XYZ_to_RGB_limit, smoothCusps, iterativeGamutCompressorIterations, startStepSize);
     float normFact = 1.0f / max(0.0001f, length(JMboundary - achromaticIntercept));
     float v = length(JMinput-achromaticIntercept) * normFact;
 

@@ -34,6 +34,9 @@ define_window_layout_xml {<?xml version="1.0" encoding="UTF-8"?>
 Root {
  inputs 0
  name /Users/afry/GitHub/output-transforms-dev/display-transforms/nuke/CAMDRT_breakout_v002.nk
+ frame 75
+ last_frame 78
+ lock_range true
  colorManagement Nuke
  OCIO_config custom
  customOCIOConfigPath /Users/afry/Documents/GitHub/OpenColorIO-Configs/aces_1.2/config.ocio
@@ -134,7 +137,7 @@ Read {
  origset true
  name Read7
  xpos -907
- ypos 304
+ ypos 323
 }
 Dot {
  name Dot24
@@ -1723,8 +1726,8 @@ Group {
  name DRT_CAM
  label "Input: \[value encoding_in] / \[value primaries_in]\nLimit: \[value primaries_limit] / \[value ssts_luminance.2]nits\nOutput: \[value encoding_out] / \[value primaries_out]\n\[value toneScaleMode]\n\[file tail \[value BlinkScript1.kernelSourceFile]]"
  note_font "Bitstream Vera Sans"
- xpos -901
- ypos 766
+ xpos -907
+ ypos 752
  addUserKnob {20 User}
  addUserKnob {26 input_div l Input}
  addUserKnob {4 encoding_in l encoding t "the input log or gamma encoding" M {Linear ACEScct sRGB BT.1886 "Gamma 2.6" ST2084 "" ""}}
@@ -1768,9 +1771,11 @@ Group {
  addUserKnob {6 apply_gamut_compression l "apply out of gamut compression " t "toggle the gamut compression towards the limiting primaries" +STARTLINE}
  apply_gamut_compression true
  addUserKnob {6 iterativeGamutCompressor -STARTLINE}
+ iterativeGamutCompressor true
  addUserKnob {4 primaries_limit l "limiting primaries" t "the limiting primaries of the gamut to which to compress to" M {AP0-ACES AP1-ACES sRGB/Rec.709-D65 Rec.2020-D65 P3-D65 P3-DCI "" "" "" ""}}
- primaries_limit P3-D65
+ primaries_limit sRGB/Rec.709-D65
  addUserKnob {7 cusp_mid_blend l "cusp to mid blend" t "blend the lightness (J) of the focal point of the compression between the lightness of the gamut cusp at the given hue (0.0)  and the mid luminance of the SSTS (1.0)"}
+ cusp_mid_blend 0.85
  addUserKnob {26 cusp_mid_blend_label l " " -STARTLINE T "cusp (0) to mid gray (1)"}
  addUserKnob {7 focus_distance l "focus distance" t "Focus distance value behind acchromatic.  Larger value is closer to opposite cusp point behind the achromatic.  Smaller value is closer to achromatic.\n\n0=achromatic, 1=cusp behind achromatic"}
  focus_distance 1000
@@ -1945,12 +1950,25 @@ Group {
 end_group
 Viewer {
  inputs 3
- frame_range 1-100
- input_number 1
+ frame 75
+ frame_range 1-78
  colour_sample_bbox {0.6731770635 0.2057291716 0.6736111045 0.2061631978}
  viewerProcess None
  monitorOutOutputTransform rec709
  name Viewer1
  xpos -1240
  ypos 1008
+}
+Read {
+ inputs 0
+ file_type exr
+ file /Users/afry/GitHub/ACES_ODT_SampleFrames/ACES_OT_VWG_SampleFrames/ACES_OT_VWG_SampleFrames.####.exr
+ format "1920 1080 0 0 1920 1080 1 HD_1080"
+ last 78
+ origlast 78
+ origset true
+ raw true
+ name Read1
+ xpos -767
+ ypos 309
 }
