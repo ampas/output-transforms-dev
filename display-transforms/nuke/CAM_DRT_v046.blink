@@ -134,6 +134,47 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
     bool iterativeGamutCompressor;
     int iterativeGamutCompressorIterations;
 
+    // 36 gamut parameters
+    float2 upperHullGamma_0;
+    float2 upperHullGamma_1;
+    float2 upperHullGamma_2;
+    float2 upperHullGamma_3;
+    float2 upperHullGamma_4;
+    float2 upperHullGamma_5;
+    float2 upperHullGamma_6;
+    float2 upperHullGamma_7;
+    float2 upperHullGamma_8;
+    float2 upperHullGamma_9;
+    float2 upperHullGamma_10;
+    float2 upperHullGamma_11;
+    float2 upperHullGamma_12;
+    float2 upperHullGamma_13;
+    float2 upperHullGamma_14;
+    float2 upperHullGamma_15;
+    float2 upperHullGamma_16;
+    float2 upperHullGamma_17;
+    float2 upperHullGamma_18;
+    float2 upperHullGamma_19;
+    float2 upperHullGamma_20;
+    float2 upperHullGamma_21;
+    float2 upperHullGamma_22;
+    float2 upperHullGamma_23;
+    float2 upperHullGamma_24;
+    float2 upperHullGamma_25;
+    float2 upperHullGamma_26;
+    float2 upperHullGamma_27;
+    float2 upperHullGamma_28;
+    float2 upperHullGamma_29;
+    float2 upperHullGamma_30;
+    float2 upperHullGamma_31;
+    float2 upperHullGamma_32;
+    float2 upperHullGamma_33;
+    float2 upperHullGamma_34;
+    float2 upperHullGamma_35;
+    float2 upperHullGamma_36;
+
+
+
 
     // How much the edges of the target RGB cube are smoothed when finding the gamut boundary 
     // in order to reduce visible contours at the gamut cusps

@@ -1964,8 +1964,8 @@ float3 uncompress_bjorn(float3 xyz)
     }
     if (diagnosticMode == 18)
     {
-      // return float3(interpolatedCompressionFuncParams.y, interpolatedCompressionFuncParams.z, JMh.z);
-      return float3(JMh.x, JMboundary.y, JMh.z);
+      return float3(interpolatedCompressionFuncParams.x,interpolatedCompressionFuncParams.y, interpolatedCompressionFuncParams.z);
+      // return float3(JMh.x, JMboundary.y, JMh.z);
     }
     if (diagnosticMode == 20)
     {
