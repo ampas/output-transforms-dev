@@ -2103,7 +2103,7 @@ float3 uncompress_bjorn(float3 xyz)
     if (!applyGamutCompression)
       return JMh;
     // quick hack to trap super small M values. Was previously 0.0f .... Needs further investigation
-    if (project_from.y < 0.0001f)
+    if (project_from.y < 0.000001f)
       return JMh;
 
     // Calculate where the out of gamut color is projected to
