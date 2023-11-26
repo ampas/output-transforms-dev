@@ -337,11 +337,11 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
 
   }
 
-#include "/Users/nick/github/aces-ot-vwg-experiments/nuke/CAM_DRT_v050_funcs.rpp"
+#include "/Users/nick/github/output-transforms-dev/display-transforms/nuke/CAM_DRT_v050_funcs.rpp"
 
   void init()
   {
-#include "/Users/nick/github/aces-ot-vwg-experiments/nuke/CAM_DRT_v050_init.rpp"
+#include "/Users/nick/github/output-transforms-dev/display-transforms/nuke/CAM_DRT_v050_init.rpp"
 }
 
 
@@ -355,22 +355,25 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
     float3 compressedJMh;
     float3 tonemappedJMh;
     float3 JMh;
+    float3 diagnostic;
 
     if( invert )
     {
       compressedJMh = output_RGB_to_JMh(srcRGB);
       tonemappedJMh = compressGamut(compressedJMh, 1);
       JMh = inverseTonescale(tonemappedJMh);
-      dstRGB = JMh_to_input_RGB(JMh);
+      diagnostic = JMh_to_input_RGB(JMh);
     }
     else
     {
       JMh = input_RGB_to_JMh(srcRGB);
       tonemappedJMh = forwardTonescale(JMh);
       compressedJMh = compressGamut(tonemappedJMh, 0);
-      dstRGB = JMh_to_output_RGB(compressedJMh);
+      diagnostic = JMh_to_output_RGB(compressedJMh);
     }
 
-    dst() = float4(dstRGB.x, dstRGB.y, dstRGB.z, source.w ); 
+#include "/Users/nick/github/output-transforms-dev/display-transforms/nuke/CAM_DRT_v050_diagnostics.rpp"
+
+    dst() = float4(diagnostic.x, diagnostic.y, diagnostic.z, source.w ); 
   }
 };
