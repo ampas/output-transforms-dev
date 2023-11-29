@@ -1,0 +1,199 @@
+    if ( diagnosticMode == 1 || diagnosticMode == 6 )
+    {
+      // Mode 6 actually returns XYZ, mode 1 returns real JMh
+      if( invert )
+      {
+        diagnostic =  JMh_to_input_RGB(srcRGB);
+      }
+      else
+      {
+        diagnostic =  JMh;
+      }
+
+    }
+    else if ( diagnosticMode == 2 || diagnosticMode == 99 )
+    {
+      diagnostic = tonemappedJMh;
+    }
+    else if ( diagnosticMode == 3 || diagnosticMode == 5 )
+    {
+      diagnostic =  compressedJMh;
+    }
+    else if ( diagnosticMode == 4 || diagnosticMode == 7 )
+    {
+      if (diagnosticMode == 4)
+        srcRGB = JMh;
+      dstRGB = JMh_to_output_RGB(srcRGB);
+      diagnostic =  dstRGB;
+    }
+    else if ( diagnosticMode == 8)
+    {
+      diagnostic =  inWhite;
+    }
+    else if ( diagnosticMode == 9)
+    {
+      diagnostic =  outWhite;
+    }
+    else if ( diagnosticMode == 10)
+    {
+      diagnostic =  limitWhite;
+    }
+    else if ( diagnosticMode == 11)
+    {
+      diagnostic =  d65White;
+    }
+    else if (diagnosticMode == 12)
+    {
+      // output gamut boundry
+      diagnostic = compressGamut(srcRGB, 1);
+    }
+    else if (diagnosticMode == 13)
+    {
+      // output gamut boundry
+      diagnostic = compressGamut(srcRGB, invert);
+    }
+    else if (diagnosticMode == 14)
+    {
+      // output gamut cusp
+      diagnostic = float3(cuspFromTable(srcRGB.z).x, cuspFromTable(srcRGB.z).y, srcRGB.z);
+    }
+    else if (diagnosticMode == 15)
+    {
+      // output AP1 cusp
+      diagnostic = float3(cuspFromTableAP1(srcRGB.z).x, cuspFromTableAP1(srcRGB.z).y, srcRGB.z);
+    }
+    else if (diagnosticMode == 16)
+    {
+      // output Locus cusp
+      diagnostic = float3(cuspFromTableLocus(srcRGB.z).x, cuspFromTableLocus(srcRGB.z).y, srcRGB.z);
+    }
+    else if (diagnosticMode == 17)
+    {
+      // output Locus boundry
+      diagnostic = getLocusBoundry(srcRGB);
+    }
+    else if (diagnosticMode == 18)
+    {
+      // output gamut boundry
+      diagnostic = compressGamut(srcRGB, 0  );
+    }
+    else if (diagnosticMode == 19)
+    {
+      // output Reach boundry
+      diagnostic = getReachBoundry(srcRGB);
+    }
+    else if (diagnosticMode == 20)
+    {
+      // output JMFocus
+      diagnostic = compressGamut(srcRGB, 1);
+    }
+
+
+
+
+
+    // extra modes to allow for easier breakout of the order of events.
+    // modes starting with 100
+
+    ////// FORWARD PATHWAY
+
+    else if (diagnosticMode == 100)
+    {
+      // display encoding to display linear
+      float3 inputRGB = clamp3(srcRGB, -HALF_MAXIMUM, HALF_MAXIMUM);
+      diagnostic = encodingToLuminance3( encodingIn, inputRGB);
+      
+    }  
+        else if (diagnosticMode == 101)
+    {
+        // convert to linear XYZ luminance values
+        diagnostic = vector_dot(RGB_to_XYZ_input, srcRGB);
+    }
+    else if (diagnosticMode == 102)
+    {
+      // convert luminanceXYZ to JMh
+      diagnostic = XYZ_to_JMh(srcRGB, inWhite, d65White, viewingConditions, L_A, Y_b, discountIlluminant_in, HK_mode_in);
+    }
+
+    else if (diagnosticMode == 103)
+    {
+      // JMh to tonemappedJMh
+      diagnostic = forwardTonescale(srcRGB);
+    }
+
+    else if (diagnosticMode == 104)
+    {
+      // JMh to gamut compressed JMh
+      diagnostic = compressGamut(srcRGB, 0);
+    }
+
+    else if (diagnosticMode == 105)
+    {
+      // JMh to luminance XYZ
+      diagnostic = JMh_to_XYZ( srcRGB, limitWhite, d65White, outputViewingConditions , L_A_out, Y_b_out, discountIlluminant_out, HK_mode_out);
+    }
+
+    else if (diagnosticMode == 106)
+    {
+        // display luminance XYZ to display linear RGB
+        diagnostic = vector_dot(XYZ_to_RGB_output, srcRGB);
+    }
+    else if (diagnosticMode == 107)
+    {
+        // display linear RGB to display encoded RGB
+        diagnostic = luminanceToEncoding3( encodingOut, srcRGB);
+    }
+
+
+
+
+
+    
+    
+    ////// INVERSE PATHWAY
+    
+    else if (diagnosticMode == 200)
+    {
+        // output display encoded RGB to display linear RGB
+        diagnostic = encodingToLuminance3(encodingOut, srcRGB);
+    }
+    else if (diagnosticMode == 201)
+    {
+        // output display linear RGB to output display linear XYZ
+        diagnostic = vector_dot(RGB_to_XYZ_output, srcRGB);
+    }
+    
+    else if (diagnosticMode == 202)
+    {
+        // output XYZ to JMh
+        diagnostic = XYZ_to_JMh(srcRGB, limitWhite, d65White, viewingConditions, L_A_out, Y_b_out, discountIlluminant_out,HK_mode_out);
+    }
+    
+    
+    else if (diagnosticMode == 203)
+    {
+        // uncompress gamut
+        diagnostic = compressGamut(srcRGB, 1);
+    }    
+    
+    
+    else if (diagnosticMode == 204)
+    {
+        // inverse tonescale in JMh
+      diagnostic = inverseTonescale(srcRGB);  
+    }  
+    else if (diagnosticMode == 205)
+    {
+        // inverted JMh back to XYZ
+        diagnostic = JMh_to_XYZ( srcRGB, inWhite, d65White, viewingConditions , L_A, Y_b, discountIlluminant_in, HK_mode_in);
+    }
+    else if (diagnosticMode == 206)
+    {
+        // XYZ back to luminance RGB
+        diagnostic = vector_dot(XYZ_to_RGB_input, srcRGB);
+    }
+    else if (diagnosticMode == 207)
+    {
+        // luminance RGB to input encoding RGB
+        diagnostic = luminanceToEncoding3( encodingIn, srcRGB);
+    }
