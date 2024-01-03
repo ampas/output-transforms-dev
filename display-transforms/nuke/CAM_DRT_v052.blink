@@ -1749,13 +1749,13 @@ float3 uncompress_bjorn(float3 xyz)
     int index = int(h);
     float t = (h - index);
     float gamma = 1.0f;
-    if (index < 355)
+    if (index < 359)
     {
         gamma = lerp(gamutTopGamma[index], gamutTopGamma[index+1], t);
     }
     else
     {
-        gamma = lerp(gamutTopGamma[355], gamutTopGamma[0], t);
+        gamma = lerp(gamutTopGamma[359], gamutTopGamma[0], t);
     }
 
     return gamma;
@@ -2815,18 +2815,20 @@ float3 uncompress_bjorn(float3 xyz)
      float slope_gain = limitJmax * focusDistance;
 
      float3 testJmh = float3(JMcusp.x + ((limitJmax - JMcusp.x) / 2.0f ), JMcusp.y , float(i));
+     float maxRGBtestVal = daniele_m_0;
      for( int Tg = 70; Tg < 170; ++Tg )
       {
-        // float sampleM = float(M);
+          // float sampleM = float(M);
         float topGamma = float(Tg) / 100.0f;
         //                     findGamutBoundaryIntersection(float3 JMh_s   , float2 JM_cusp,     float J_focus, float J_max, float slope_gain, float smoothness, float gamma_top)
         float3 approxLimit  =  findGamutBoundaryIntersection(        testJmh,         JMcusp,(JMcusp.x+38.0f)/2,   limitJmax,       slope_gain,      smoothCusps,       topGamma);
 
         float3 newLimitRGB = JMh_to_limit_RGB(float3(approxLimit.x, approxLimit.y, float(i)));
-        if (newLimitRGB.x > 100.0f || newLimitRGB.y > 100.0f || newLimitRGB.z > 100.0f)
+        // gamutTopGamma[i] = newLimitRGB.x;
+        if (newLimitRGB.x > maxRGBtestVal || newLimitRGB.y > maxRGBtestVal || newLimitRGB.z > maxRGBtestVal)
         {
-        //   gamutTopGamma[i] = topGamma;
-          gamutTopGamma[i] = JMcusp.y;
+          gamutTopGamma[i] = topGamma;
+        //   gamutTopGamma[i] = 3.0f;
           break;
         }
       }
