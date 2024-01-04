@@ -66,11 +66,11 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
     bool applyChromaCompression;
     bool applyInGamutExpansion;
     bool applyInGamutCompression;
-    bool applydeNoise;
+    bool applyReachClamp;
     bool monochrome;
 
     // Chroma compression params (limit, k1, k2)
-    float3 chromaCParams;
+    float chroma_compress;
     int cc_et;
     int ccReach;
     // xy coordintes for chroma compression gamut
@@ -251,10 +251,9 @@ kernel DRT_CAM_Kernel : ImageComputationKernel<ePixelWise>
     float daniele_m_2;
 
     // Chroma compression pre-calculated constants
-    float3 ccParams;  // Limit, strength, high-light attenuation
+    float compr;      // Compression
     float sat;        // Saturation
     float sat_thr;    // Threshold to start expanding saturation
-    float toe;        // Noise reduction
 
     // ST2084 vars
     float st2084_m_1;
@@ -721,25 +720,6 @@ float3 uncompress_bjorn(float3 xyz)
     HSV.y = cmax == 0.0f ? 0.0f : delta / cmax;
     HSV.z = cmax;
     return HSV;
-  }
-
-  // Compress/expand a range of values from 0 to limit (0 being the achromatic).  Doesn't
-  // affect anything beyond the limit.  The k1 parameter affects the strength of the curve,
-  // the k2 parameter affects the expansion rate of the curve.
-  // https://www.desmos.com/calculator/vqxgfzzyvx
-  float chroma_range(float x, float limit, float k1, float k2, int inverse)
-  {
-    if (x > limit)
-      return x;
-
-    k2 = max(k2, 0.002f);
-    k1 = sqrt(k1 * k1 + k2 * k2);
-    float k3 = (limit + k1) / (limit + k2);
-
-    if (!inverse)
-      return 0.5f * (k3 * x - k1 + sqrt((k3 * x - k1) * (k3 * x - k1) + 4 * k2 * k3 * x));
-    else
-      return (x * x + k1 * x) / (k3 * (x + k2));
   }
 
   // Smooth minimum of a and b
@@ -1553,27 +1533,29 @@ float3 uncompress_bjorn(float3 xyz)
     return JMcusp.y * e_t;
   }
 
-  // Return multiplier to compress noise
-  float compress_noise(float x)
+  // A "toe" function that remaps the given value x between 0 and limit.
+  // The k1 and k2 parameters change the size and shape of the toe.
+  // https://www.desmos.com/calculator/6vplvw14ti
+  float toe(float x, float limit, float k1, float k2, int inverse)
   {
-    if (!applydeNoise)
-      return 1.0f;
-    float f = pow(x, 1.1f);
-    return f / (f + toe);
+    if (x > limit)
+      return x;
+
+    k2 = max(k2, 0.001f);
+    k1 = sqrt(k1 * k1 + k2 * k2);
+    float k3 = (limit + k1) / (limit + k2);
+
+    if (!inverse)
+      return 0.5f * (k3 * x - k1 + sqrt((k3 * x - k1) * (k3 * x - k1) + 4 * k2 * k3 * x));
+    else
+      return (x * x + k1 * x) / (k3 * (x + k2));
   }
 
-  // In-gamut chroma compression
+  // Chroma compression
   //
   // Compresses colors inside the gamut with the aim for colorfulness to have an
   // appropriate rate of change from display black to display white, and from
   // achromatic outward to purer colors.
-  //
-  // Steps:
-  //  - Scale down M by tonescaledJ / origJ
-  //  - Normalize M to compression gamut boundary (becomes hue-dependent)
-  //  - Expand and compress M with chroma_range().  Compression is increased as tonescaledJ
-  //    increases to create the path-to-white.
-  //  - Denormalize M with the gamut cusp
   //
   float chromaCompression(float3 JMh, float origJ, float linear, int invert)
   {
@@ -1581,41 +1563,63 @@ float3 uncompress_bjorn(float3 xyz)
     if (M == 0.0f)
       return M;
 
-    // Enforce sane input
-    M = min(2500.0f, M);
-
     float nJ = JMh.x / limitJmax;
-    float snJ = pow(max(0.0f, 1.0f - nJ), ccParams.z);
-    float scaling = pow(JMh.x / origJ, model_gamma);
-    float Mcusp = cusp_with_eccentricity_factor(JMh.z);
-    float limit = pow(nJ, model_gamma) * cReachFromTable(JMh.z) / Mcusp;
-    float shd = compress_noise(nJ);
+    float snJ = max(0.0f, 1.0f - nJ);
+    float Mnorm = cusp_with_eccentricity_factor(JMh.z);
+    float limit = pow(nJ, model_gamma) * cReachFromTable(JMh.z) / Mnorm;
 
     if (!invert)
     {
-      M *= scaling;
+      //
+      // Rescaling of M with the tonescaled J to get the M to the same range as
+      // J after the tonescale.  The rescaling uses the Hellwig2022 model gamma to
+      // keep the M/J ratio correct (keeping the chromaticities constant).
+      //
+      M *= pow(JMh.x / origJ, model_gamma);
+
       if (applyInGamutCompression)
       {
-        M /= Mcusp;
+        // Normalize M with the rendering space cusp M
+        M /= Mnorm;
+
+        //
+        // Expand the colorfulness by running the toe function in reverse.  The goal is to
+        // expand less saturated colors less and more saturated colors more.  The expansion
+        // increases saturation in the shadows and mid-tones but not in the highlights.
+        // The 0.001 offset starts the expansions slightly above zero.  The sat_thr makes
+        // the toe less aggressive near black to reduce the expansion of noise.
+        //
         if (applyInGamutExpansion)
-          M = chroma_range(M, limit, snJ * sat, sqrt(nJ * nJ + sat_thr), 1);
-        M = chroma_range(M, limit, nJ * ccParams.y, snJ, 0);
-        M *= Mcusp;
-        M *= shd;
+          M = limit - toe(limit - M, limit - 0.001f, snJ * sat, sqrt(nJ * nJ + sat_thr), 0);
+
+        //
+        // Compress the colorfulness.  The goal is to compress less saturated colors more and
+        // more saturated colors less, especially in the highlights.  This step creates the
+        // saturation roll-off in the highlights, but attemps to preserve pure colors.  This
+        // mostly affects highlights and mid-tones, and does not compress shadows.
+        //
+        M = toe(M, limit, nJ * compr, snJ, 0);
+
+        // Clamp M to the rendering space
+        if (applyReachClamp)
+          M = min(limit, M);
+
+        // Denormalize
+        M *= Mnorm;
       }
     }
     else
     {
       if (applyInGamutCompression)
       {
-        M /= shd;
-        M /= Mcusp;
-        M = chroma_range(M, limit, nJ * ccParams.y, snJ, 1);
+        M /= Mnorm;
+        M = toe(M, limit, nJ * compr, snJ, 1);
         if (applyInGamutExpansion)
-          M = chroma_range(M, limit, snJ * sat, sqrt(nJ * nJ + sat_thr), 0);
-        M *= Mcusp;
+          M = limit - toe(limit - M, limit - 0.001f, snJ * sat, sqrt(nJ * nJ + sat_thr), 1);
+        M *= Mnorm;
       }
-      M /= scaling;
+
+      M *= pow(JMh.x / origJ, -model_gamma);
     }
 
     return M;
@@ -2040,8 +2044,6 @@ float3 uncompress_bjorn(float3 xyz)
 
     if (!applyGamutCompression)
       return JMh;
-    // quick hack to trap super small M values. Was previously 0.0f .... Needs further investigation
-//    if (project_from.y < 0.000001f)
     if (project_from.y == 0.0f)
       return JMh;
 
@@ -2375,15 +2377,11 @@ float3 uncompress_bjorn(float3 xyz)
     // 1.0f / (c * z)
     model_gamma = 1.0f / (viewingConditionsToSurround(outputViewingConditions).y * (1.48f + sqrt(Y_b_out / L_A_out)));
 
-    // In-gamut compression scaling for HDR/SDR appearance match
+    // Chroma compression scaling for HDR/SDR appearance match
     float log_peak = log10(daniele_n / daniele_n_r);
+    compr = chroma_compress + 20.0f * log_peak;
     sat = max(0.2f, 1.9f - 1.55f * log_peak);
-    sat_thr = max(0.00007f, 0.017f - 0.015f * log_peak);
-    ccParams.y = chromaCParams.y + 15.0f * log_peak;
-    ccParams.z = 1.0f / max(0.5f, chromaCParams.z - 0.2f * log_peak);
-
-    // Noise reduction
-    toe = max(0.0001f, 0.002f - 0.0003f * log_peak);
+    sat_thr = 0.5f / daniele_n;
 
     float identity_matrix_data[]={ 1.0f, 0.0f, 0.0f,
                                    0.0f, 1.0f, 0.0f,
@@ -2821,7 +2819,7 @@ float3 uncompress_bjorn(float3 xyz)
           // float sampleM = float(M);
         float topGamma = float(Tg) / 100.0f;
         //                     findGamutBoundaryIntersection(float3 JMh_s   , float2 JM_cusp,     float J_focus, float J_max, float slope_gain, float smoothness, float gamma_top)
-        float3 approxLimit  =  findGamutBoundaryIntersection(        testJmh,         JMcusp,(JMcusp.x+38.0f)/2,   limitJmax,       slope_gain,      smoothCusps,       topGamma);
+        float3 approxLimit  =  findGamutBoundaryIntersection(        testJmh,         JMcusp,(JMcusp.x+38.0f)/2,   limitJmax,       slope_gain,      0.0f,       topGamma);
 
         float3 newLimitRGB = JMh_to_limit_RGB(float3(approxLimit.x, approxLimit.y, float(i)));
         // gamutTopGamma[i] = newLimitRGB.x;
