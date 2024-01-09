@@ -2829,7 +2829,7 @@ float3 uncompress_bjorn(float3 xyz)
           // float sampleM = float(M);
         float topGamma = float(Tg) / 100.0f;
         //                     findGamutBoundaryIntersection(float3 JMh_s   , float2 JM_cusp,     float J_focus, float J_max, float slope_gain, float smoothness, float gamma_top)
-        float3 approxLimit  =  findGamutBoundaryIntersection(        testJmh,         JMcusp,(JMcusp.x+midJ)/2,   limitJmax,       slope_gain,      0.0f,       topGamma);
+        float3 approxLimit  =  findGamutBoundaryIntersection(        testJmh,         JMcusp, lerp(JMcusp.x, midJ, cuspMidBlend),   limitJmax,       slope_gain,      0.0f,       topGamma);
 
         float3 newLimitRGB = JMh_to_limit_RGB(float3(approxLimit.x, approxLimit.y, float(i)));
         // gamutTopGamma[i] = maxRGBtestVal;
