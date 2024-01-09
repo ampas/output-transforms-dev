@@ -988,10 +988,12 @@ float3 uncompress_bjorn(float3 xyz)
       luminanceXYZ = JMh;
     }
 
-    float3 luminanceRGB = vector_dot(XYZ_to_RGB_output, luminanceXYZ);
+    // First matrix to limiting gamut for clamping
+    float3 luminanceRGB = vector_dot(XYZ_to_RGB_limit, luminanceXYZ);
 
     if( fitWhite)
     {
+      // Scale to fit maximum creative white channel value
       float3 creativeWhiteXYZ = vector_dot(RGB_to_XYZ_limit, float3(1.0f, 1.0f, 1.0f));
       float3 creativeWhiteRGB = vector_dot(XYZ_to_RGB_output, creativeWhiteXYZ);
       luminanceRGB  *= 1.0f / max(creativeWhiteRGB.x, max(creativeWhiteRGB.y, creativeWhiteRGB.z));
@@ -1004,6 +1006,16 @@ float3 uncompress_bjorn(float3 xyz)
       luminanceRGB = compress_aces(luminanceRGB, compr, compr, compr, 0);
     }
 
+    if( clampOutput )
+    {
+      // Clamp to between zero and peak luminance 
+      luminanceRGB = clamp3(luminanceRGB, 0.0f, peakLuminance);
+    }
+
+    // Matrix to output (encoding) gamut (eventually concatenate to a single matrix)
+    luminanceRGB = vector_dot(RGB_to_XYZ_limit, luminanceRGB);
+    luminanceRGB = vector_dot(XYZ_to_RGB_output, luminanceRGB);
+
     // return luminanceRGB when in breakout mode
     if (diagnosticMode == 105)
     {
@@ -1011,11 +1023,6 @@ float3 uncompress_bjorn(float3 xyz)
     }
 
     float3 outputRGB = luminanceToEncoding3( encodingOut, luminanceRGB);
-
-    if( clampOutput )
-    {
-      outputRGB = clamp3(outputRGB, 0.0f, 1.0f);
-    }
 
     return outputRGB;
   }
@@ -2788,6 +2795,8 @@ float3 uncompress_bjorn(float3 xyz)
       }
     }
 
+    midJ = XYZ_to_JMh(refWhite * daniele_c_t * mmScaleFactor, refWhite, outputViewingConditions, L_A_out, Y_b_out, discountIlluminant_mid, HK_mode_mid).x;
+
     // quick test to see why table isn't getting populated
     // gamutTopGamma[0] = 1.0f;
 
@@ -2820,7 +2829,7 @@ float3 uncompress_bjorn(float3 xyz)
           // float sampleM = float(M);
         float topGamma = float(Tg) / 100.0f;
         //                     findGamutBoundaryIntersection(float3 JMh_s   , float2 JM_cusp,     float J_focus, float J_max, float slope_gain, float smoothness, float gamma_top)
-        float3 approxLimit  =  findGamutBoundaryIntersection(        testJmh,         JMcusp,(JMcusp.x+38.0f)/2,   limitJmax,       slope_gain,      0.0f,       topGamma);
+        float3 approxLimit  =  findGamutBoundaryIntersection(        testJmh,         JMcusp,(JMcusp.x+midJ)/2,   limitJmax,       slope_gain,      0.0f,       topGamma);
 
         float3 newLimitRGB = JMh_to_limit_RGB(float3(approxLimit.x, approxLimit.y, float(i)));
         // gamutTopGamma[i] = maxRGBtestVal;
@@ -2835,8 +2844,6 @@ float3 uncompress_bjorn(float3 xyz)
 
 
     // debugPrint(&gamutTopGamma,1,1); 
-
-    midJ = XYZ_to_JMh(refWhite * daniele_c_t * mmScaleFactor, refWhite, outputViewingConditions, L_A_out, Y_b_out, discountIlluminant_mid, HK_mode_mid).x;
 
 
     // Cusp table for AP1 gamut
